@@ -76,11 +76,19 @@ class GiftConciergeController extends Controller
             'contents' => $contents,
            'systemInstruction' => [
     'parts' => [[
-        'text' => "You are the Colombo Gift Concierge. Help users find cakes, flowers, and gifts on Kapruka. " .
-                  "CRITICAL SEARCH RULES:\n" .
-                  "1. When calling `kapruka_search_products`, keep the query parameter `q` strictly to a SINGLE broad keyword (e.g., use 'chocolate' or 'gateau', NOT 'chocolate cake').\n" .
-                  "2. Never combine the category name with the search keyword (e.g., if category is 'cakes', search for 'chocolate', never 'chocolate cake').\n" .
-                  "3. If a search yields no results, try a different single-word synonym."
+        'text' => "You are the \"Colombo Gift Concierge,\" an elite, high-end AI assistant helping users find, validate, and purchase gifts on Kapruka.\n\n" .
+                  "Core Behavior:\n" .
+                  "1. Identity: Warm, professional, and helpful. Periodically use Sri Lankan greetings like \"Ayubowan\" or local context naturally, but stay highly functional.\n" .
+                  "2. Search Guardrails: The Kapruka database search is highly sensitive to keywords. If a user inputs a complex phrase, extract ONLY the core single-word noun (e.g., if user says \"delicious chocolate cake for birthday\", search ONLY for \"cake\" or \"chocolate\"). Never include prices or adjectives in the query parameter.\n" .
+                  "3. Chaining Intent:\n" .
+                  "   - When a user shows direct interest in a specific product from a list, immediately call `kapruka_get_product` using the Product ID to fetch rich media.\n" .
+                  "   - If the item is perishable (cakes, flowers), proactively ask for the delivery city and date to run `kapruka_check_delivery` before they even ask.\n" .
+                  "4. Presentation: Keep conversational text concise. Rely on the frontend to render data blocks. Never display raw JSON text to the user.\n" .
+                  "5. Checkout & Order Creation:\n" .
+                  "   - You are authorized to assist users with checking out using the `kapruka_create_order` tool.\n" .
+                  "   - When a user indicates they want to purchase an item, collect the following required info: recipient_name, recipient_phone, delivery_address, delivery_date, sender_name, and sender_phone. Do not guess or hallucinate these details. Ask for them naturally.\n" .
+                  "   - Once gathered, execute the `kapruka_create_order` tool.\n" .
+                  "   - When the tool returns a payment URL, respond with a very brief, polite confirmation message. Do not output the raw URL directly in your text response."
     ]]
 ],
             'tools' => [
@@ -95,7 +103,7 @@ class GiftConciergeController extends Controller
                                 'category' => ['type' => 'STRING', 'description' => 'Category filter like cakes, flowers, electronics'],
                                 'limit' => ['type' => 'INTEGER', 'description' => 'Max results to return (default 5)']
                             ],
-                            'required' => ['q'] // Enforcing our rule from earlier!
+                            'required' => ['q']
                         ]
                     ],
                     [
@@ -109,8 +117,25 @@ class GiftConciergeController extends Controller
                             ],
                             'required' => ['city', 'delivery_date']
                         ]
+                    ],
+                    [
+                        'name' => 'kapruka_create_order',
+                        'description' => 'Create a new checkout order on Kapruka.',
+                        'parameters' => [
+                            'type' => 'OBJECT',
+                            'properties' => [
+                                'product_id' => ['type' => 'STRING', 'description' => 'The ID of the product being purchased'],
+                                'recipient_name' => ['type' => 'STRING', 'description' => 'Name of the recipient'],
+                                'recipient_phone' => ['type' => 'STRING', 'description' => 'Contact number of the recipient'],
+                                'delivery_address' => ['type' => 'STRING', 'description' => 'Complete delivery address in Sri Lanka'],
+                                'delivery_date' => ['type' => 'STRING', 'description' => 'Desired delivery date (YYYY-MM-DD)'],
+                                'sender_name' => ['type' => 'STRING', 'description' => 'Name of the sender'],
+                                'sender_phone' => ['type' => 'STRING', 'description' => 'Contact number of the sender'],
+                                'gift_message' => ['type' => 'STRING', 'description' => 'Optional gift card message']
+                            ],
+                            'required' => ['product_id', 'recipient_name', 'recipient_phone', 'delivery_address', 'delivery_date', 'sender_name', 'sender_phone']
+                        ]
                     ]
-                    // Add the remaining 5 tool schemas here following the same structure
                 ]
             ]
         ];
