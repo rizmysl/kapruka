@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 interface RawData {
   id?: string;
   name?: string;
-  price?: number;
+  price?: number | any;
   currency?: string;
   image_url?: string;
   direct_url?: string;
@@ -20,234 +20,762 @@ interface Message {
   raw_data?: RawData;
 }
 
+// Safely parse and normalize tool output data from the backend.
+const getParsedData = (rawData: any): any => {
+  if (!rawData) return null;
+  if (rawData.results || rawData.id || rawData.checkout_url || rawData.order_number || rawData.city || rawData.available !== undefined) {
+    return rawData;
+  }
+  if (typeof rawData.result === 'string') {
+    try { return JSON.parse(rawData.result); } catch { return rawData; }
+  }
+  if (rawData.result && typeof rawData.result === 'object') return rawData.result;
+  if (Array.isArray(rawData.content)) {
+    for (const part of rawData.content) {
+      if (part?.type === 'text' && typeof part.text === 'string') {
+        try { return JSON.parse(part.text); } catch { return { text_content: part.text }; }
+      }
+    }
+  }
+  if (rawData.structuredContent && typeof rawData.structuredContent === 'object') return rawData.structuredContent;
+  return rawData;
+};
+
+// SVG Icons
+const SendIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 2L11 13" /><path d="M22 2L15 22L11 13L2 9L22 2Z" />
+  </svg>
+);
+const SunIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+  </svg>
+);
+const MoonIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+  </svg>
+);
+
 export default function ChatApp() {
     const [messages, setMessages] = useState<Message[]>([
-        { role: 'bot', text: "Ayubowan! I am your Colombo Gift Concierge. What kind of gift are you looking for today?" }
+        { role: 'bot', text: "Ayubowan! ✨ I'm your Colombo Gift Concierge — powered by AI and the Kapruka catalog. Tell me who you're shopping for, and I'll find the perfect gift!" }
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [activeProduct, setActiveProduct] = useState<RawData | null>(null); // Controls the right pane
+    const [activeProduct, setActiveProduct] = useState<any>(null);
+    const [activePayment, setActivePayment] = useState<any>(null);
+    const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success'>('idle');
+    const [paidOrders, setPaidOrders] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('kapruka-orders');
+            return saved ? JSON.parse(saved) : [];
+        }
+        return [];
+    });
+    const [showHistory, setShowHistory] = useState(false);
+    const [useMock, setUseMock] = useState(true);
+    const [darkMode, setDarkMode] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('kapruka-dark') === 'true';
+        }
+        return false;
+    });
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
+    useEffect(() => {
+        document.documentElement.classList.toggle('dark', darkMode);
+        localStorage.setItem('kapruka-dark', String(darkMode));
+    }, [darkMode]);
+
     const sendMessage = async (eOrText: any) => {
         if (eOrText?.preventDefault) eOrText.preventDefault();
-        
         const userText = typeof eOrText === 'string' ? eOrText : input;
         if (!userText.trim()) return;
 
         setInput('');
-        setMessages(prev => [...prev, { role: 'user', text: userText }]);
+        const updatedMessages = [...messages, { role: 'user' as const, text: userText }];
+        setMessages(updatedMessages);
         setIsLoading(true);
+
+        const history = updatedMessages
+            .slice(1, -1)
+            .map(msg => ({ role: msg.role === 'user' ? 'user' : 'model', parts: [{ text: msg.text }] }))
+            .slice(-20);
 
         try {
             const response = await fetch('http://localhost:8002/chat/message', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ message: userText })
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ message: userText, use_mock: useMock, history })
             });
-
             const data = await response.json();
-
-            setMessages(prev => [...prev, { 
-                role: 'bot', 
-                text: data.text,
-                tool: data.tool_called,
-                raw_data: data.raw_data
+            setMessages(prev => [...prev, {
+                role: 'bot', text: data.text, tool: data.tool_called, raw_data: data.raw_data
             }]);
-
-            // If the AI fetched a specific product, automatically open it in the right pane!
             if (data.tool_called === 'kapruka_get_product' && data.raw_data) {
-                setActiveProduct(data.raw_data);
+                setActiveProduct(getParsedData(data.raw_data));
             }
-
         } catch (error) {
             console.error('Chat error:', error);
-            setMessages(prev => [...prev, { role: 'bot', text: "Sorry, I had trouble reaching the Kapruka database." }]);
+            setMessages(prev => [...prev, { role: 'bot', text: "Sorry, I had trouble reaching the Kapruka database. Please try again." }]);
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="flex h-screen w-full bg-[#FDF2F4] overflow-hidden font-sans">
-            
-            {/* PANE 1: LEFT SIDEBAR (Kapruka Deep Blue) */}
-            <div className="w-64 bg-[#002F6C] text-white flex flex-col shadow-2xl z-20 hidden md:flex">
-                <div className="p-6 pb-2">
-                    <h1 className="text-2xl font-extrabold tracking-tight text-white flex items-center gap-2">
-                        <span className="text-[#FF7A00]">k</span>apruka
+        <div className={`flex h-screen w-full overflow-hidden font-sans transition-colors duration-300 ${darkMode ? 'bg-dark-bg' : 'bg-gradient-to-br from-[#FDF2F4] via-white to-[#FDF2F4]'}`}>
+
+            {/* ═══════════════ PANE 1: SIDEBAR ═══════════════ */}
+            <div className={`w-64 flex flex-col z-20 hidden md:flex transition-colors duration-300 ${
+                darkMode
+                    ? 'bg-dark-surface/80 backdrop-blur-xl border-r border-dark-border'
+                    : 'bg-gradient-to-b from-[#002F6C] to-[#001845] shadow-2xl'
+            }`}>
+                {/* Logo */}
+                <div className="p-6 pb-3">
+                    <h1 className="text-2xl font-black tracking-tight flex items-center gap-1">
+                        <span className="gradient-text">K</span>
+                        <span className="text-white">apruka</span>
                     </h1>
-                    <p className="text-xs text-white/60 mt-1 font-medium tracking-wider uppercase">Gift Concierge</p>
+                    <p className={`text-[10px] mt-1 font-semibold tracking-[0.2em] uppercase ${darkMode ? 'text-dark-muted' : 'text-white/50'}`}>
+                        Gift Concierge · AI
+                    </p>
                 </div>
 
-                <nav className="flex-1 px-4 mt-8 space-y-2">
-                    <a href="#" className="flex items-center gap-3 px-4 py-3 bg-white/10 rounded-xl text-sm font-semibold transition-colors">
-                        💬 Active Chat
-                    </a>
-                    <a href="#" className="flex items-center gap-3 px-4 py-3 text-white/60 hover:bg-white/5 rounded-xl text-sm font-medium transition-colors">
-                        📦 Order History
-                    </a>
-                    <a href="#" className="flex items-center gap-3 px-4 py-3 text-white/60 hover:bg-white/5 rounded-xl text-sm font-medium transition-colors">
-                        ⚙️ Settings
-                    </a>
+                {/* Nav */}
+                <nav className="flex-1 px-3 mt-6 space-y-1">
+                    <button onClick={() => { setShowHistory(false); setActiveProduct(null); setActivePayment(null); }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 text-left cursor-pointer ${
+                            !showHistory && !activeProduct && !activePayment
+                                ? darkMode ? 'bg-brand-purple/10 text-brand-purple' : 'bg-white/10 text-white'
+                                : darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
+                        }`}
+                    >
+                        <span className="text-base">💬</span> Active Chat
+                    </button>
+                    <button onClick={() => { setShowHistory(true); setActiveProduct(null); setActivePayment(null); }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-left cursor-pointer ${
+                            showHistory
+                                ? darkMode ? 'bg-brand-purple/10 text-brand-purple' : 'bg-white/10 text-white'
+                                : darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
+                        }`}
+                    >
+                        <span className="text-base">📦</span> Order History
+                    </button>
+                    <button onClick={() => { setShowHistory(false); setActiveProduct(null); setActivePayment(null); sendMessage("Show me all categories"); }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-left cursor-pointer ${
+                            darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
+                        }`}
+                    >
+                        <span className="text-base">🗂️</span> Categories
+                    </button>
                 </nav>
 
-                <div className="p-6">
-                    <div className="bg-white/10 p-4 rounded-xl text-xs text-white/70">
-                        <p className="font-semibold text-white mb-1">Hackathon Build</p>
-                        <p>Powered by Gemini & MCP</p>
+                {/* Preferences Header */}
+                <p className={`text-[9px] font-bold tracking-[0.2em] uppercase px-4 mb-2 ${darkMode ? 'text-dark-muted' : 'text-white/40'}`}>
+                    Preferences Settings
+                </p>
+
+                {/* Controls */}
+                <div className="px-4 space-y-3 mb-4">
+                    {/* Dark Mode Toggle */}
+                    <button
+                        onClick={() => setDarkMode(!darkMode)}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 cursor-pointer ${
+                            darkMode
+                                ? 'bg-white/5 text-dark-text hover:bg-white/10'
+                                : 'bg-white/10 text-white hover:bg-white/15'
+                        }`}
+                    >
+                        <span className="flex items-center gap-2">
+                            {darkMode ? <MoonIcon /> : <SunIcon />}
+                            {darkMode ? 'Dark Mode' : 'Light Mode'}
+                        </span>
+                        <div className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${darkMode ? 'bg-brand-purple' : 'bg-white/30'}`}>
+                            <motion.div
+                                animate={{ x: darkMode ? 20 : 0 }}
+                                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-md"
+                            />
+                        </div>
+                    </button>
+
+                    {/* Mock/Live Toggle */}
+                    <div className={`p-4 rounded-xl transition-colors duration-300 ${
+                        darkMode ? 'bg-white/5 border border-dark-border' : 'bg-white/10'
+                    }`}>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className={`text-xs font-bold tracking-wide ${darkMode ? 'text-dark-text' : 'text-white'}`}>
+                                    {useMock ? '🧪 Mock Mode' : '🔴 Live API'}
+                                </p>
+                                <p className={`text-[10px] mt-0.5 ${darkMode ? 'text-dark-muted' : 'text-white/40'}`}>
+                                    {useMock ? 'Using sample data' : 'Calling Gemini + MCP'}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setUseMock(!useMock)}
+                                className={`relative w-12 h-6 rounded-full transition-colors duration-300 cursor-pointer ${
+                                    useMock ? 'bg-brand-purple' : 'bg-emerald-500'
+                                }`}
+                            >
+                                <motion.div
+                                    animate={{ x: useMock ? 0 : 24 }}
+                                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                    className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md"
+                                />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="px-4 pb-4">
+                    <div className={`p-3 rounded-xl text-[10px] ${
+                        darkMode ? 'bg-white/5 text-dark-muted border border-dark-border' : 'bg-white/5 text-white/40'
+                    }`}>
+                        <p className={`font-bold mb-0.5 ${darkMode ? 'text-dark-text' : 'text-white/70'}`}>Hackathon 2026</p>
+                        <p>Powered by Gemini · MCP · Kapruka</p>
                     </div>
                 </div>
             </div>
 
-            {/* PANE 2: CENTER CHAT FEED (Maroon Light Background) */}
-            <div className="flex-1 flex flex-col relative h-full">
-                
-                {/* Mobile Header (Hidden on Desktop) */}
-                <div className="md:hidden bg-[#002F6C] text-white p-4 shadow-md z-10 flex justify-between items-center">
-                    <h1 className="text-lg font-bold">Kapruka Concierge</h1>
-                    <button className="text-white/80">☰</button>
+            {/* ═══════════════ PANE 2: CHAT FEED ═══════════════ */}
+            <div className="flex-1 flex flex-col relative h-full noise-bg">
+
+                {/* Mobile Header */}
+                <div className={`md:hidden p-4 shadow-md z-10 flex justify-between items-center transition-colors duration-300 ${
+                    darkMode ? 'bg-dark-surface border-b border-dark-border' : 'bg-[#002F6C]'
+                }`}>
+                    <h1 className="text-lg font-bold text-white">Kapruka Concierge</h1>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setDarkMode(!darkMode)} className="text-white/80 p-1">
+                            {darkMode ? <SunIcon /> : <MoonIcon />}
+                        </button>
+                    </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8">
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-6 relative z-10">
                     <AnimatePresence>
-                        {messages.map((msg, index) => (
-                            <motion.div 
-                                key={index} 
-                                initial={{ opacity: 0, y: 20 }}
+                        {messages.length === 1 ? (
+                            <motion.div
+                                initial={{ opacity: 0, y: 25 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                transition={{ type: "spring", stiffness: 260, damping: 25 }}
-                                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                className="flex flex-col items-center justify-center max-w-2xl mx-auto my-auto py-6 text-center gap-6"
                             >
-                                <div className={`max-w-[80%] p-5 shadow-sm backdrop-blur-md ${
-                                    msg.role === 'user' 
-                                        ? 'bg-[#FF7A00] text-white rounded-3xl rounded-br-sm' 
-                                        : 'bg-white/90 text-gray-800 border border-[#7A1C2C]/20 rounded-3xl rounded-bl-sm shadow-xl'
+                                {/* Glowing Icon */}
+                                <div className="w-16 h-16 bg-gradient-to-br from-brand-purple to-brand-purple-light rounded-2xl flex items-center justify-center text-3xl shadow-xl shadow-brand-purple/25 animate-float cursor-pointer hover:scale-105 transition-transform duration-300">
+                                    🎁
+                                </div>
+
+                                {/* Big Title */}
+                                <div>
+                                    <h2 className="text-3xl md:text-5xl font-black tracking-tight leading-tight">
+                                        Colombo <span className="bg-gradient-to-r from-brand-purple via-brand-purple-light to-[#A17BD9] bg-clip-text text-transparent">Gift Concierge</span>
+                                    </h2>
+                                    <p className={`text-[9px] font-extrabold tracking-[0.25em] uppercase mt-2.5 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>
+                                        AI-Driven Luxury Gifting Platform
+                                    </p>
+                                </div>
+
+                                {/* Description */}
+                                <p className={`text-xs md:text-sm max-w-md leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>
+                                    Find, verify, and complete checkout for premium Kapruka gifts directly inside a conversation. Discover cakes, flowers, and toys with real-time delivery tracking.
+                                </p>
+
+                                {/* How It Works Grid */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 w-full text-left mt-2">
+                                    <div className={`p-5 rounded-2xl border transition-all duration-300 ${
+                                        darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple/40' : 'bg-white border-gray-100 shadow-md hover:shadow-xl'
+                                    }`}>
+                                        <span className="text-xl mb-2.5 block">🔍</span>
+                                        <h4 className={`font-bold text-xs uppercase tracking-wide mb-1.5 ${darkMode ? 'text-dark-text' : 'text-brand-purple'}`}>Search Catalog</h4>
+                                        <p className={`text-[10px] leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
+                                            Instantly search cakes, flowers, and soft toys in real-time with filters.
+                                        </p>
+                                    </div>
+                                    <div className={`p-5 rounded-2xl border transition-all duration-300 ${
+                                        darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple/40' : 'bg-white border-gray-100 shadow-md hover:shadow-xl'
+                                    }`}>
+                                        <span className="text-xl mb-2.5 block">🚚</span>
+                                        <h4 className={`font-bold text-xs uppercase tracking-wide mb-1.5 ${darkMode ? 'text-dark-text' : 'text-brand-purple'}`}>Check Delivery</h4>
+                                        <p className={`text-[10px] leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
+                                            Confirm flat shipping rates, arrival dates, and city compatibility checks.
+                                        </p>
+                                    </div>
+                                    <div className={`p-5 rounded-2xl border transition-all duration-300 ${
+                                        darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple/40' : 'bg-white border-gray-100 shadow-md hover:shadow-xl'
+                                    }`}>
+                                        <span className="text-xl mb-2.5 block">💳</span>
+                                        <h4 className={`font-bold text-xs uppercase tracking-wide mb-1.5 ${darkMode ? 'text-dark-text' : 'text-brand-purple'}`}>In-App Checkout</h4>
+                                        <p className={`text-[10px] leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
+                                            Pay securely within the chat interface and track status stages.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Greeting Bot Bubble */}
+                                <div className={`p-5 text-left rounded-3xl rounded-bl-lg max-w-full mt-2 border ${
+                                    darkMode ? 'bg-dark-card/40 border-dark-border/40 text-dark-text' : 'bg-white border-gray-100/80 shadow-md text-gray-700'
                                 }`}>
-                                    
+                                    <p className="text-xs leading-relaxed">
+                                        Ayubowan! ✨ I'm your Colombo Gift Concierge. Tell me who you're shopping for, or select a quick option below to get started!
+                                    </p>
+                                </div>
+                            </motion.div>
+                        ) : (
+                            messages.map((msg, index) => (
+                                <motion.div
+                                    key={index}
+                                    initial={{ opacity: 0, y: 20, scale: 0.97 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    transition={{ type: "spring", stiffness: 300, damping: 28 }}
+                                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                >
+                                    <div className={`max-w-[80%] p-5 transition-colors duration-300 ${
+                                        msg.role === 'user'
+                                            ? 'bg-gradient-to-br from-[#402970] to-[#2E1C52] text-white rounded-3xl rounded-br-lg shadow-lg shadow-[#402970]/20'
+                                            : darkMode
+                                                ? 'glass rounded-3xl rounded-bl-lg shadow-lg'
+                                                : 'glass-strong rounded-3xl rounded-bl-lg shadow-lg'
+                                    }`}>
+
                                     {/* Conversational text */}
                                     {msg.text && (
-                                        <div className="prose prose-sm max-w-none">
+                                        <div className={`prose prose-sm max-w-none ${
+                                            msg.role === 'user'
+                                                ? 'prose-invert'
+                                                : darkMode ? 'prose-invert' : ''
+                                        }`}>
                                             <ReactMarkdown>{msg.text}</ReactMarkdown>
                                         </div>
                                     )}
 
-                                    {/* Search Results Block */}
-                                    {msg.tool === 'kapruka_search_products' && msg.raw_data?.structuredContent?.result && (
-                                        <motion.div 
-                                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
-                                            className="mt-4 p-4 bg-[#FDF2F4]/50 rounded-2xl border border-[#7A1C2C]/10 prose prose-sm max-w-none text-sm"
-                                        >
-                                            <ReactMarkdown>{msg.raw_data.structuredContent.result}</ReactMarkdown>
-                                        </motion.div>
-                                    )}
-
-                                    {/* Logistics Badge */}
-                                    {msg.tool === 'kapruka_check_delivery' && msg.raw_data && (
-                                        <div className="mt-4 p-4 bg-white rounded-2xl border border-[#7A1C2C]/20 flex items-center gap-4">
-                                            <div className="p-3 bg-[#FF7A00] text-white rounded-xl text-xl animate-bounce">🚚</div>
-                                            <div className="flex-1">
-                                                <h4 className="font-bold text-gray-800 text-sm">Delivery to {msg.raw_data.city || 'Destination'}</h4>
-                                                <div className="mt-1 flex gap-4 text-xs font-medium">
-                                                    <span className="text-[#7A1C2C]">💰 Fee: {msg.raw_data.currency} {msg.raw_data.cost}</span>
-                                                    <span className="text-green-600">⏱️ Time: {msg.raw_data.estimated_days}</span>
+                                    {/* ── 1. Search Results Grid ── */}
+                                    {msg.tool === 'kapruka_search_products' && msg.raw_data && (() => {
+                                        const searchData = getParsedData(msg.raw_data);
+                                        if (!searchData || !Array.isArray(searchData.results)) {
+                                            const mdText = msg.raw_data?.result || msg.raw_data?.structuredContent?.result;
+                                            return mdText ? (
+                                                <div className={`mt-4 p-4 rounded-2xl border prose prose-sm max-w-none text-sm ${
+                                                    darkMode ? 'bg-dark-card/50 border-dark-border text-dark-text' : 'bg-[#FDF2F4]/50 border-[#7A1C2C]/10 text-gray-800'
+                                                }`}>
+                                                    <ReactMarkdown>{mdText}</ReactMarkdown>
                                                 </div>
-                                            </div>
-                                        </div>
-                                    )}
+                                            ) : null;
+                                        }
 
-                                    {/* 5. Render Checkout Link (For kapruka_create_order) */}
-                                    {msg.tool === 'kapruka_create_order' && msg.raw_data && (
-                                        <motion.div 
-                                            initial={{ opacity: 0, scale: 0.95 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            transition={{ type: "spring", stiffness: 260, damping: 25 }}
-                                            className="mt-5 p-6 bg-gradient-to-br from-[#002F6C] to-[#001f4d] text-white rounded-3xl shadow-2xl border border-[#002F6C]/50 flex flex-col items-center text-center gap-3 relative overflow-hidden"
-                                        >
-                                            {/* Subtle background glow effect */}
-                                            <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF7A00]/20 rounded-full blur-3xl -mr-10 -mt-10"></div>
-                                            
-                                            <div className="w-14 h-14 bg-[#FF7A00] rounded-2xl flex items-center justify-center text-3xl shadow-lg z-10">
-                                                🛍️
+                                        return (
+                                            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                {searchData.results.map((product: any) => (
+                                                    <motion.div
+                                                        key={product.id}
+                                                        whileHover={{ y: -4, scale: 1.02 }}
+                                                        className={`rounded-2xl p-3 flex flex-col justify-between transition-all duration-200 cursor-pointer ${
+                                                            darkMode
+                                                                ? 'bg-dark-card border border-dark-border hover:border-brand-orange/30 hover:shadow-lg hover:shadow-brand-orange/5'
+                                                                : 'bg-white border border-gray-100 shadow-md hover:shadow-xl'
+                                                        }`}
+                                                    >
+                                                        <div>
+                                                            <div className={`h-32 rounded-xl overflow-hidden mb-2 relative group flex items-center justify-center ${
+                                                                darkMode ? 'bg-dark-bg' : 'bg-gray-50'
+                                                            }`}>
+                                                                {product.image_url ? (
+                                                                    <img src={product.image_url} alt={product.name}
+                                                                        className="max-h-full max-w-full object-contain group-hover:scale-110 transition-transform duration-300" />
+                                                                ) : (
+                                                                    <div className={`w-full h-full flex items-center justify-center text-xs ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>No Image</div>
+                                                                )}
+                                                                <span className={`absolute top-2 right-2 text-[8px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${
+                                                                    product.in_stock
+                                                                        ? darkMode ? 'bg-emerald-900/50 text-emerald-400' : 'bg-green-100 text-green-700'
+                                                                        : darkMode ? 'bg-red-900/50 text-red-400' : 'bg-red-100 text-red-700'
+                                                                }`}>
+                                                                    {product.in_stock ? 'In Stock' : 'Sold Out'}
+                                                                </span>
+                                                            </div>
+                                                            <h4 className={`font-bold text-[11px] line-clamp-2 leading-snug ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>
+                                                                {product.name}
+                                                            </h4>
+                                                        </div>
+                                                        <div className="mt-3">
+                                                            <div className="flex items-baseline justify-between mb-2">
+                                                                <span className="text-xs font-extrabold text-brand-purple">
+                                                                    {product.price?.currency || 'LKR'} {product.price?.amount || product.price}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex gap-1.5">
+                                                                <button
+                                                                    onClick={() => setActiveProduct(product)}
+                                                                    className={`flex-1 py-1.5 rounded-lg text-[9px] font-bold transition-all duration-200 ${
+                                                                        darkMode
+                                                                            ? 'bg-white/10 text-white hover:bg-white/20'
+                                                                            : 'bg-[#002F6C] text-white hover:bg-[#001f4d]'
+                                                                    }`}
+                                                                >
+                                                                    Inspect 🔍
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => sendMessage(`I would like to checkout and order product ${product.id} (${product.name}). Please help me complete the purchase.`)}
+                                                                    disabled={!product.in_stock}
+                                                                    className="flex-1 py-1.5 bg-gradient-to-r from-brand-purple to-brand-purple-dark text-white hover:shadow-lg hover:shadow-brand-purple/20 disabled:opacity-40 rounded-lg text-[9px] font-bold transition-all duration-200"
+                                                                >
+                                                                    Buy 🛍️
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </motion.div>
+                                                ))}
                                             </div>
-                                            
-                                            <div className="z-10">
-                                                <h4 className="font-extrabold text-xl tracking-tight">Order Ready!</h4>
-                                                <p className="text-sm text-white/80 mt-1.5 max-w-[260px] leading-relaxed">
-                                                    Your delivery details are confirmed and your items are locked in. 
-                                                </p>
-                                            </div>
+                                        );
+                                    })()}
 
-                                            {/* The Live Payment Link */}
-                                            {msg.raw_data.checkout_url ? (
-                                                <a 
-                                                    href={msg.raw_data.checkout_url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="mt-3 w-full py-4 bg-white text-[#002F6C] hover:bg-[#FDF2F4] hover:text-[#7A1C2C] hover:shadow-[0_0_20px_rgba(255,122,0,0.3)] font-extrabold rounded-xl shadow-md transition-all duration-300 uppercase tracking-widest text-sm z-10"
-                                                >
-                                                    Proceed to Payment 💳
-                                                </a>
-                                            ) : (
-                                                <div className="mt-3 w-full py-4 bg-white/10 text-white/50 font-bold rounded-xl border border-white/10 uppercase tracking-widest text-sm z-10">
-                                                    Generating Link...
+                                    {/* ── 2. Delivery Card ── */}
+                                    {msg.tool === 'kapruka_check_delivery' && msg.raw_data && (() => {
+                                        const deliveryData = getParsedData(msg.raw_data);
+                                        if (!deliveryData) return null;
+                                        return (
+                                            <motion.div
+                                                initial={{ opacity: 0, scale: 0.95 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                className={`mt-4 p-4 rounded-2xl shadow-md transition-colors duration-300 ${
+                                                    darkMode ? 'bg-dark-card border border-dark-border' : 'bg-white border border-[#7A1C2C]/10'
+                                                }`}
+                                            >
+                                                <div className="flex items-start gap-4">
+                                                    <div className="p-3 bg-gradient-to-br from-brand-purple to-brand-purple-dark text-white rounded-2xl text-xl shadow-md">🚚</div>
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <h4 className={`font-extrabold text-sm ${darkMode ? 'text-dark-text' : 'text-[#002F6C]'}`}>
+                                                                Delivery to {deliveryData.city}
+                                                            </h4>
+                                                            <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                                                                deliveryData.available
+                                                                    ? darkMode ? 'bg-emerald-900/50 text-emerald-400' : 'bg-green-100 text-green-700'
+                                                                    : darkMode ? 'bg-red-900/50 text-red-400' : 'bg-red-100 text-red-700'
+                                                            }`}>
+                                                                {deliveryData.available ? 'Available' : 'Unavailable'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="mt-2 grid grid-cols-2 gap-3 text-xs font-semibold">
+                                                            <div className={`p-2 rounded-xl ${darkMode ? 'bg-dark-bg border border-dark-border' : 'bg-[#FDF2F4] border border-[#7A1C2C]/5'}`}>
+                                                                <p className={`text-[9px] font-medium ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>Shipping Fee</p>
+                                                                <p className={`mt-0.5 ${darkMode ? 'text-brand-purple' : 'text-[#7A1C2C]'}`}>{deliveryData.currency || 'LKR'} {deliveryData.rate || deliveryData.cost}</p>
+                                                            </div>
+                                                            <div className={`p-2 rounded-xl ${darkMode ? 'bg-dark-bg border border-dark-border' : 'bg-[#FDF2F4] border border-[#7A1C2C]/5'}`}>
+                                                                <p className={`text-[9px] font-medium ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>Delivery Date</p>
+                                                                <p className="text-emerald-500 mt-0.5">{deliveryData.checked_date || deliveryData.estimated_days}</p>
+                                                            </div>
+                                                        </div>
+                                                        {deliveryData.perishable_warning && (
+                                                            <div className={`mt-3 p-2 rounded-xl text-[9px] flex items-center gap-2 ${
+                                                                darkMode ? 'bg-yellow-900/20 border border-yellow-800/30 text-yellow-400' : 'bg-yellow-50 border border-yellow-200 text-yellow-800'
+                                                            }`}>
+                                                                <span>⚠️</span>
+                                                                <p className="font-medium leading-normal">{deliveryData.perishable_warning}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            )}
-                                            
-                                            <div className="text-[10px] text-white/40 flex items-center gap-1.5 mt-2 z-10 font-medium tracking-wide uppercase">
-                                                <span>🔒 Secure 60-Minute Price Lock</span>
-                                            </div>
-                                        </motion.div>
-                                    )}
+                                            </motion.div>
+                                        );
+                                    })()}
 
-                                    {/* Contextual Badge indicating Product is in Right Pane */}
+                                    {/* ── 3. Checkout Card ── */}
+                                    {msg.tool === 'kapruka_create_order' && msg.raw_data && (() => {
+                                        const orderData = getParsedData(msg.raw_data);
+                                        if (!orderData) return null;
+
+                                        if (orderData.text_content || orderData.error) {
+                                            const errMsg = orderData.text_content || orderData.error;
+                                            return (
+                                                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                                                    className={`mt-4 p-4 rounded-2xl text-sm flex items-start gap-3 ${
+                                                        darkMode ? 'bg-red-900/20 border border-red-800/30 text-red-400' : 'bg-red-50 border border-red-200 text-red-800'
+                                                    }`}>
+                                                    <span className="text-xl">⚠️</span>
+                                                    <div>
+                                                        <p className="font-bold text-xs uppercase tracking-wider mb-1">Order Could Not Be Created</p>
+                                                        <p className="text-xs leading-relaxed">{errMsg}</p>
+                                                    </div>
+                                                </motion.div>
+                                            );
+                                        }
+
+                                        const payUrl = orderData.checkout_url || orderData.payment_url || orderData.pay_url || orderData.url;
+                                        const orderRef = orderData.order_ref || orderData.order_id || orderData.reference || orderData.pnref;
+                                        const total = orderData.summary?.grand_total || orderData.grand_total || orderData.total;
+                                        const currency = orderData.summary?.currency || orderData.currency || 'LKR';
+
+                                        return (
+                                            <motion.div
+                                                initial={{ opacity: 0, scale: 0.95 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                transition={{ type: "spring", stiffness: 260, damping: 25 }}
+                                                className="mt-5 p-6 bg-gradient-to-br from-[#002F6C] to-[#001845] text-white rounded-3xl shadow-2xl flex flex-col items-center text-center gap-3 relative overflow-hidden"
+                                            >
+                                                <div className="absolute top-0 right-0 w-40 h-40 bg-brand-purple/15 rounded-full blur-3xl -mr-10 -mt-10" />
+                                                <div className="absolute bottom-0 left-0 w-32 h-32 bg-brand-blue/30 rounded-full blur-3xl -ml-10 -mb-10" />
+
+                                                <div className="w-14 h-14 bg-gradient-to-br from-brand-purple to-brand-purple-dark rounded-2xl flex items-center justify-center text-3xl shadow-lg z-10 animate-float">
+                                                    🛍️
+                                                </div>
+
+                                                <div className="z-10 w-full">
+                                                    <h4 className="font-extrabold text-xl tracking-tight">Order Created!</h4>
+                                                    {orderRef && (
+                                                        <p className="text-[9px] text-brand-purple mt-1 font-mono uppercase tracking-widest font-bold">
+                                                            Ref: {orderRef}
+                                                        </p>
+                                                    )}
+                                                    {orderData.summary && (
+                                                        <div className="my-4 bg-white/5 p-4 rounded-2xl border border-white/10 text-left text-xs space-y-2">
+                                                            <div className="flex justify-between text-white/70">
+                                                                <span>Items Total</span>
+                                                                <span>{currency} {orderData.summary.items_total}</span>
+                                                            </div>
+                                                            <div className="flex justify-between text-white/70">
+                                                                <span>Delivery Fee</span>
+                                                                <span>{currency} {orderData.summary.delivery_fee}</span>
+                                                            </div>
+                                                            <div className="h-px bg-white/10 my-1" />
+                                                            <div className="flex justify-between font-bold text-sm text-brand-purple">
+                                                                <span>Grand Total</span>
+                                                                <span>{currency} {total}</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {payUrl ? (
+                                                    <div className="w-full flex flex-col gap-2.5 z-10">
+                                                        <button
+                                                            onClick={() => setActivePayment({ url: payUrl, orderRef, total, currency })}
+                                                            className="mt-2 w-full py-3.5 bg-white text-[#002F6C] hover:bg-[#FDF2F4] hover:text-[#7A1C2C] font-extrabold rounded-xl shadow-md transition-all duration-300 uppercase tracking-wider text-[11px] block text-center cursor-pointer hover:shadow-[0_0_25px_rgba(255,255,255,0.25)]"
+                                                        >
+                                                            Pay in App 📱
+                                                        </button>
+                                                        <a href={payUrl} target="_blank" rel="noopener noreferrer"
+                                                            className="text-[10px] text-white/60 hover:text-white underline transition-all font-semibold tracking-wide"
+                                                        >
+                                                            Or open in new tab ↗️
+                                                        </a>
+                                                    </div>
+                                                ) : (
+                                                    <div className="mt-2 w-full py-4 bg-white/10 text-white/50 font-bold rounded-xl border border-white/10 uppercase tracking-widest text-xs z-10 text-center">
+                                                        Payment link will be sent to your phone
+                                                    </div>
+                                                )}
+                                                <p className="text-[9px] text-white/30 mt-2 z-10 font-medium tracking-wide uppercase">🔒 Secure 60-Minute Price Lock</p>
+                                            </motion.div>
+                                        );
+                                    })()}
+
+                                    {/* ── 4. Order Tracking Timeline ── */}
+                                    {msg.tool === 'kapruka_track_order' && msg.raw_data && (() => {
+                                        const trackData = getParsedData(msg.raw_data);
+                                        if (!trackData) return null;
+
+                                        const steps = [
+                                            { key: 'received', label: 'Order Received', icon: '📝' },
+                                            { key: 'confirmed', label: 'Confirmed', icon: '💳' },
+                                            { key: 'shipped', label: 'Dispatched', icon: '🚚' },
+                                            { key: 'delivered', label: 'Delivered', icon: '🎉' }
+                                        ];
+
+                                        const currentStatus = (trackData.status || '').toLowerCase();
+                                        let activeIndex = 0;
+                                        if (currentStatus === 'confirmed') activeIndex = 1;
+                                        else if (currentStatus === 'shipped' || currentStatus === 'out-for-delivery') activeIndex = 2;
+                                        else if (currentStatus === 'delivered') activeIndex = 3;
+
+                                        return (
+                                            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                                                className={`mt-4 p-5 rounded-2xl shadow-md transition-colors duration-300 ${
+                                                    darkMode ? 'bg-dark-card border border-dark-border' : 'bg-white border border-[#7A1C2C]/10'
+                                                }`}>
+                                                <div className={`flex justify-between items-center pb-3 border-b ${darkMode ? 'border-dark-border' : 'border-gray-100'}`}>
+                                                    <div>
+                                                        <p className={`text-[9px] uppercase tracking-wider font-bold ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>Order Tracking</p>
+                                                        <h4 className={`font-extrabold text-xs font-mono mt-0.5 ${darkMode ? 'text-dark-text' : 'text-[#002F6C]'}`}>{trackData.order_number}</h4>
+                                                    </div>
+                                                    <span className="px-3 py-1 bg-brand-purple/10 text-brand-purple text-xs font-bold rounded-full border border-brand-purple/20">
+                                                        {trackData.status_display || trackData.status}
+                                                    </span>
+                                                </div>
+
+                                                <div className="mt-5 space-y-4">
+                                                    {steps.map((step, idx) => {
+                                                        const isCompleted = idx <= activeIndex;
+                                                        const isActive = idx === activeIndex;
+                                                        return (
+                                                            <div key={step.key} className="flex gap-3 relative">
+                                                                {idx < steps.length - 1 && (
+                                                                    <div className={`absolute left-4 top-8 bottom-0 w-0.5 -ml-px ${
+                                                                        idx < activeIndex ? 'bg-emerald-500' : darkMode ? 'bg-dark-border' : 'bg-gray-200'
+                                                                    }`} />
+                                                                )}
+                                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm shadow-sm z-10 transition-all ${
+                                                                    isCompleted
+                                                                        ? 'bg-emerald-500 text-white font-bold'
+                                                                        : darkMode ? 'bg-dark-bg text-dark-muted' : 'bg-gray-100 text-gray-400'
+                                                                } ${isActive ? 'ring-4 ring-emerald-500/20 scale-110' : ''}`}>
+                                                                    {step.icon}
+                                                                </div>
+                                                                <div className="flex-1 pt-0.5">
+                                                                    <p className={`text-xs font-bold ${isCompleted ? (darkMode ? 'text-dark-text' : 'text-gray-800') : (darkMode ? 'text-dark-muted' : 'text-gray-400')}`}>
+                                                                        {step.label}
+                                                                    </p>
+                                                                    {isCompleted && trackData.progress?.[idx] && (
+                                                                        <p className={`text-[9px] mt-0.5 ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>
+                                                                            {trackData.progress[idx].timestamp}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                {trackData.recipient && (
+                                                    <div className={`mt-5 p-3 rounded-xl text-[10px] space-y-1 ${
+                                                        darkMode ? 'bg-dark-bg border border-dark-border' : 'bg-[#FDF2F4] border border-[#7A1C2C]/5'
+                                                    }`}>
+                                                        <p className={`font-extrabold uppercase tracking-wider text-[8px] mb-1 ${darkMode ? 'text-brand-purple' : 'text-[#7A1C2C]'}`}>Shipping Details</p>
+                                                        <p className={darkMode ? 'text-dark-text' : ''}><span className={`font-semibold ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Recipient:</span> {trackData.recipient.name} ({trackData.recipient.phone})</p>
+                                                        <p className={darkMode ? 'text-dark-text' : ''}><span className={`font-semibold ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Address:</span> {trackData.recipient.address}, {trackData.recipient.city}</p>
+                                                    </div>
+                                                )}
+                                            </motion.div>
+                                        );
+                                    })()}
+
+                                    {/* ── 5. Categories Grid ── */}
+                                    {msg.tool === 'kapruka_list_categories' && msg.raw_data && (() => {
+                                        const catData = getParsedData(msg.raw_data);
+                                        const categories = catData?.categories || (Array.isArray(catData) ? catData : null);
+                                        if (!categories || !Array.isArray(categories)) return null;
+
+                                        const emojiMap: Record<string, string> = {
+                                            cakes: '🎂', flowers: '💐', chocolates: '🍫', clothing: '👗',
+                                            jewellery: '💎', perfumes: '✨', grocery: '🛒', liquor: '🍷',
+                                            softtoy: '🧸', sports: '⚽', electronic: '📱', fashion: '👠',
+                                            fruits: '🍇', cosmetics: '💄', birthday: '🎉', wedding: '💒',
+                                            christmas: '🎄', valentine: '❤️', anniversary: '🥂', kidstoys: '🎮',
+                                            household: '🏠', pet: '🐾', pharmacy: '💊', babyitems: '👶',
+                                            default: '🏷️'
+                                        };
+
+                                        return (
+                                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 flex flex-wrap gap-2">
+                                                {categories.slice(0, 24).map((cat: any) => {
+                                                    const name = cat.name || cat;
+                                                    const emoji = emojiMap[name.toLowerCase()] || emojiMap.default;
+                                                    return (
+                                                        <button key={name} onClick={() => sendMessage(`Show me ${name} products`)}
+                                                            className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 shadow-sm flex items-center gap-1.5 ${
+                                                                darkMode
+                                                                    ? 'bg-dark-card border border-dark-border text-dark-text hover:bg-brand-purple/10 hover:text-brand-purple hover:border-brand-purple/30'
+                                                                    : 'bg-white border border-[#002F6C]/10 text-[#002F6C] hover:bg-[#002F6C] hover:text-white hover:border-[#002F6C]'
+                                                            }`}>
+                                                            <span>{emoji}</span><span>{name}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </motion.div>
+                                        );
+                                    })()}
+
+                                    {/* ── 6. Cities Grid ── */}
+                                    {msg.tool === 'kapruka_list_delivery_cities' && msg.raw_data && (() => {
+                                        const cityData = getParsedData(msg.raw_data);
+                                        const cities = cityData?.cities || (Array.isArray(cityData) ? cityData : null);
+                                        if (!cities || !Array.isArray(cities)) return null;
+
+                                        return (
+                                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 flex flex-wrap gap-2">
+                                                {cities.slice(0, 16).map((city: any) => {
+                                                    const cityName = city.name || city;
+                                                    return (
+                                                        <button key={cityName} onClick={() => sendMessage(`Check delivery options to ${cityName} for SOFTTOY001218`)}
+                                                            className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 shadow-sm flex items-center gap-1.5 ${
+                                                                darkMode
+                                                                    ? 'bg-dark-card border border-dark-border text-dark-text hover:bg-brand-purple/10 hover:text-brand-purple hover:border-brand-purple/30'
+                                                                    : 'bg-white border border-[#002F6C]/10 text-[#002F6C] hover:bg-[#002F6C] hover:text-white hover:border-[#002F6C]'
+                                                            }`}>
+                                                            <span>📍</span><span>{cityName}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </motion.div>
+                                        );
+                                    })()}
+
+                                    {/* Product Inspector Badge */}
                                     {msg.tool === 'kapruka_get_product' && msg.raw_data && (
-                                        <button 
-                                            onClick={() => setActiveProduct(msg.raw_data || null)}
-                                            className="mt-3 text-xs font-bold text-[#7A1C2C] bg-[#FDF2F4] px-3 py-1.5 rounded-full hover:bg-[#7A1C2C] hover:text-white transition-colors flex items-center gap-1"
+                                        <button
+                                            onClick={() => setActiveProduct(getParsedData(msg.raw_data))}
+                                            className={`mt-3 text-xs font-bold px-3 py-1.5 rounded-full transition-colors flex items-center gap-1 ${
+                                                darkMode
+                                                    ? 'text-brand-purple bg-brand-purple/10 hover:bg-brand-purple hover:text-white'
+                                                    : 'text-[#7A1C2C] bg-[#FDF2F4] hover:bg-[#7A1C2C] hover:text-white'
+                                            }`}
                                         >
                                             🔍 View Product Details ➡️
                                         </button>
                                     )}
                                 </div>
                             </motion.div>
-                        ))}
+                        ))
+                    )}
                     </AnimatePresence>
-                    
+
+                    {/* Loading Indicator */}
                     {isLoading && (
                         <div className="flex justify-start">
-                            <div className="bg-white/80 p-4 rounded-3xl rounded-bl-sm border border-[#7A1C2C]/20 shadow-sm flex gap-2 items-center">
-                                <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="w-2 h-2 bg-[#FF7A00] rounded-full" />
-                                <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-2 h-2 bg-[#FF7A00] rounded-full" />
-                                <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-2 h-2 bg-[#FF7A00] rounded-full" />
+                            <div className={`p-4 rounded-3xl rounded-bl-lg shadow-sm flex gap-2.5 items-center ${
+                                darkMode ? 'glass' : 'glass-strong'
+                            }`}>
+                                <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.2 }}
+                                    className="w-2.5 h-2.5 bg-gradient-to-r from-brand-purple to-brand-purple-dark rounded-full" />
+                                <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.2 }}
+                                    className="w-2.5 h-2.5 bg-gradient-to-r from-brand-purple to-brand-purple-dark rounded-full" />
+                                <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.4 }}
+                                    className="w-2.5 h-2.5 bg-gradient-to-r from-brand-purple to-brand-purple-dark rounded-full" />
                             </div>
                         </div>
                     )}
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input Area */}
-                <div className="p-6 pt-0">
+                {/* ── Input Area ── */}
+                <div className="p-4 md:p-6 pt-0 relative z-10">
                     <AnimatePresence>
                         {!isLoading && (
-                            <motion.div 
+                            <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: 10 }}
                                 className="flex gap-2 overflow-x-auto hide-scrollbar pb-3"
                             >
-                                {['🎂 Find Birthday Cakes', '🧸 Educational Toys', '🚚 Check Kandy Delivery'].map((chip, index) => (
+                                {['🎂 Birthday Cakes', '🧸 Soft Toys', '💐 Flower Bouquets', '🚚 Check Delivery', '🗂️ All Categories'].map((chip, index) => (
                                     <button
                                         key={index}
                                         onClick={() => sendMessage(chip)}
-                                        className="whitespace-nowrap px-4 py-2 bg-white/90 backdrop-blur-md border border-[#002F6C]/10 rounded-full text-sm font-medium text-[#002F6C] hover:bg-[#FDF2F4] hover:text-[#7A1C2C] hover:border-[#7A1C2C]/30 shadow-sm transition-all duration-200"
+                                        className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-semibold transition-all duration-200 ${
+                                            darkMode
+                                                ? 'glass text-dark-text hover:text-brand-purple hover:border-brand-purple/30'
+                                                : 'glass-strong text-[#002F6C] hover:bg-[#002F6C] hover:text-white'
+                                        }`}
                                     >
                                         {chip}
                                     </button>
@@ -261,91 +789,510 @@ export default function ChatApp() {
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            placeholder="Message the concierge..."
-                            className="flex-1 p-4 bg-white border border-[#002F6C]/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#FF7A00] shadow-sm text-gray-700"
+                            placeholder="Tell me about a gift you're looking for..."
+                            className={`flex-1 p-4 rounded-2xl focus-glow transition-all duration-300 text-sm ${
+                                darkMode
+                                    ? 'glass-input text-dark-text placeholder:text-dark-muted border border-dark-border focus:border-brand-purple/50'
+                                    : 'glass-input text-gray-700 placeholder:text-gray-400 border border-[#002F6C]/10 focus:border-brand-purple'
+                            }`}
                             disabled={isLoading}
                         />
-                        <button 
-                            type="submit" 
+                        <button
+                            type="submit"
                             disabled={isLoading || !input.trim()}
-                            className="px-6 py-4 bg-[#FF7A00] text-white font-bold rounded-2xl hover:bg-[#e66e00] disabled:opacity-50 transition-colors shadow-md"
+                            className="p-4 bg-gradient-to-br from-brand-purple to-brand-purple-dark text-white font-bold rounded-2xl hover:shadow-lg hover:shadow-brand-purple/25 disabled:opacity-40 disabled:hover:shadow-none transition-all duration-300 active:scale-95"
                         >
-                            Send
+                            <SendIcon />
                         </button>
                     </form>
                 </div>
             </div>
 
-            {/* PANE 3: RIGHT PRODUCT INSPECTOR */}
+            {/* ═══════════════ PANE 3: PRODUCT INSPECTOR ═══════════════ */}
             <AnimatePresence>
                 {activeProduct && (
-                    <motion.div 
+                    <motion.div
                         initial={{ x: 400, opacity: 0 }}
                         animate={{ x: 0, opacity: 1 }}
                         exit={{ x: 400, opacity: 0 }}
-                        transition={{ type: "spring", stiffness: 260, damping: 25 }}
-                        className="w-80 lg:w-[400px] bg-white border-l border-[#002F6C]/10 shadow-2xl flex flex-col z-30 h-full"
+                        transition={{ type: "spring", stiffness: 280, damping: 28 }}
+                        className={`w-80 lg:w-[400px] flex flex-col z-30 h-full transition-colors duration-300 ${
+                            darkMode
+                                ? 'bg-dark-surface/95 backdrop-blur-xl border-l border-dark-border'
+                                : 'bg-white/95 backdrop-blur-xl border-l border-[#002F6C]/10 shadow-2xl'
+                        }`}
                     >
-                        <div className="p-4 flex justify-between items-center border-b border-gray-100 bg-[#FDF2F4]/30">
-                            <h3 className="font-semibold text-[#002F6C] text-sm uppercase tracking-wider">Product Inspector</h3>
-                            <button 
+                        {/* Header */}
+                        <div className={`p-4 flex justify-between items-center border-b transition-colors duration-300 ${
+                            darkMode ? 'border-dark-border' : 'border-gray-100 bg-[#FDF2F4]/30'
+                        }`}>
+                            <h3 className={`font-semibold text-sm uppercase tracking-wider ${darkMode ? 'text-dark-text' : 'text-[#002F6C]'}`}>
+                                Product Inspector
+                            </h3>
+                            <button
                                 onClick={() => setActiveProduct(null)}
-                                className="text-gray-400 hover:text-[#7A1C2C] p-2 bg-white rounded-full hover:bg-[#FDF2F4] transition-colors"
+                                className={`p-2 rounded-full transition-colors ${
+                                    darkMode ? 'text-dark-muted hover:text-white hover:bg-white/10' : 'text-gray-400 hover:text-[#7A1C2C] hover:bg-[#FDF2F4]'
+                                }`}
                             >
                                 ✕
                             </button>
                         </div>
-                        
-                        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
-                            {/* Product Image */}
-                            <div className="rounded-3xl overflow-hidden bg-gray-50 border border-gray-100 p-2 shadow-inner">
-                                {activeProduct.image_url ? (
-                                    <img 
-                                        src={activeProduct.image_url} 
-                                        alt={activeProduct.name} 
-                                        className="w-full h-64 object-contain rounded-2xl"
-                                    />
-                                ) : (
-                                    <div className="w-full h-64 flex items-center justify-center text-gray-400">No Image Available</div>
-                                )}
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
+                            {/* Image */}
+                            <div className={`rounded-2xl overflow-hidden p-2 relative group ${
+                                darkMode ? 'bg-dark-card border border-dark-border' : 'bg-gray-50 border border-gray-100'
+                            }`}>
+                                {(() => {
+                                    const imgUrl = activeProduct.image_url || activeProduct.images?.[0];
+                                    return imgUrl ? (
+                                        <img src={imgUrl} alt={activeProduct.name}
+                                            className="w-full h-64 object-contain rounded-xl group-hover:scale-105 transition-transform duration-500" />
+                                    ) : (
+                                        <div className={`w-full h-64 flex items-center justify-center ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>No Image Available</div>
+                                    );
+                                })()}
                             </div>
 
-                            {/* Product Details */}
+                            {/* Name & Price */}
                             <div>
-                                <h2 className="text-2xl font-bold text-[#002F6C] leading-tight mb-2">
+                                <h2 className={`text-xl font-extrabold leading-tight mb-2 ${darkMode ? 'text-dark-text' : 'text-[#002F6C]'}`}>
                                     {activeProduct.name || 'Kapruka Item'}
                                 </h2>
-                                <div className="flex items-center justify-between mt-4 border-t border-b border-gray-100 py-4">
-                                    <span className="text-3xl font-extrabold text-[#FF7A00]">
-                                        {activeProduct.currency} {activeProduct.price}
+                                <div className={`flex items-center justify-between mt-3 py-3 border-t border-b ${
+                                    darkMode ? 'border-dark-border' : 'border-gray-100'
+                                }`}>
+                                    <span className="text-2xl font-extrabold text-brand-purple">
+                                        {activeProduct.price?.currency || activeProduct.currency || 'LKR'} {typeof activeProduct.price === 'object' ? activeProduct.price.amount : activeProduct.price}
                                     </span>
-                                    <span className={`text-xs px-3 py-1.5 rounded-full font-bold uppercase tracking-wide ${activeProduct.in_stock ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wide ${
+                                        activeProduct.in_stock
+                                            ? darkMode ? 'bg-emerald-900/50 text-emerald-400' : 'bg-green-100 text-green-700'
+                                            : darkMode ? 'bg-red-900/50 text-red-400' : 'bg-red-100 text-red-700'
+                                    }`}>
                                         {activeProduct.in_stock ? '● In Stock' : '○ Out of Stock'}
                                     </span>
                                 </div>
                             </div>
 
+                            {/* Description */}
+                            {(activeProduct.description || activeProduct.summary) && (
+                                <div className={`text-xs leading-relaxed pb-4 border-b ${
+                                    darkMode ? 'text-dark-muted border-dark-border' : 'text-gray-600 border-gray-100'
+                                }`}>
+                                    <h4 className={`font-bold mb-1 ${darkMode ? 'text-dark-text' : 'text-[#002F6C]'}`}>Description</h4>
+                                    <p>{activeProduct.description || activeProduct.summary}</p>
+                                </div>
+                            )}
+
+                            {/* Attributes */}
+                            {activeProduct.attributes && (
+                                <div className={`grid grid-cols-2 gap-2 text-[10px] p-3 rounded-xl ${
+                                    darkMode ? 'bg-dark-card border border-dark-border' : 'bg-gray-50 border border-gray-100'
+                                }`}>
+                                    {activeProduct.attributes.weight && (
+                                        <div>
+                                            <span className={`block ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>Weight</span>
+                                            <span className={`font-bold ${darkMode ? 'text-dark-text' : 'text-gray-700'}`}>{activeProduct.attributes.weight}</span>
+                                        </div>
+                                    )}
+                                    {activeProduct.attributes.vendor && (
+                                        <div>
+                                            <span className={`block ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>Vendor</span>
+                                            <span className={`font-bold ${darkMode ? 'text-dark-text' : 'text-gray-700'}`}>{activeProduct.attributes.vendor}</span>
+                                        </div>
+                                    )}
+                                    {activeProduct.rating && (
+                                        <div className="col-span-2 mt-1 flex items-center gap-1">
+                                            <span className="text-yellow-400">★</span>
+                                            <span className={`font-bold ${darkMode ? 'text-dark-text' : 'text-gray-700'}`}>{activeProduct.rating} / 5.0</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Action Buttons */}
-                            <div className="mt-auto space-y-3 pt-6">
-                                {activeProduct.direct_url && (
-                                    <a 
-                                        href={activeProduct.direct_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="block w-full text-center bg-[#002F6C] hover:bg-[#001f4d] shadow-lg hover:shadow-xl text-white py-4 rounded-2xl font-bold transition-all duration-200"
-                                    >
-                                        View on Kapruka Main Store
-                                    </a>
-                                )}
-                                <button 
-                                    onClick={() => {
-                                        sendMessage(`Check delivery options to Kandy for ${activeProduct.name}`);
-                                    }}
-                                    className="block w-full text-center bg-white border-2 border-[#7A1C2C] text-[#7A1C2C] hover:bg-[#FDF2F4] py-3 rounded-2xl font-bold transition-all duration-200"
+                            <div className="mt-auto space-y-3 pt-4">
+                                {(() => {
+                                    const storeUrl = activeProduct.direct_url || activeProduct.url;
+                                    return storeUrl ? (
+                                        <a href={storeUrl} target="_blank" rel="noopener noreferrer"
+                                            className={`block w-full text-center py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
+                                                darkMode
+                                                    ? 'bg-white/10 text-white hover:bg-white/20 border border-dark-border'
+                                                    : 'bg-[#002F6C] hover:bg-[#001f4d] text-white shadow-lg hover:shadow-xl'
+                                            }`}>
+                                            View on Kapruka Store
+                                        </a>
+                                    ) : null;
+                                })()}
+                                <button
+                                    onClick={() => sendMessage(`I would like to checkout and order product ${activeProduct.id || activeProduct.name} (${activeProduct.name}). Please help me complete the purchase.`)}
+                                    className="block w-full text-center bg-gradient-to-r from-brand-purple to-brand-purple-dark text-white py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider hover:shadow-lg hover:shadow-brand-purple/25 transition-all duration-200"
+                                >
+                                    🛒 Buy This Gift
+                                </button>
+                                <button
+                                    onClick={() => sendMessage(`Check delivery options to Kandy for ${activeProduct.name || activeProduct.id}`)}
+                                    className={`block w-full text-center py-3 rounded-xl font-bold text-xs transition-all duration-200 border-2 ${
+                                        darkMode
+                                            ? 'border-dark-border text-dark-text hover:bg-white/5'
+                                            : 'border-[#7A1C2C] text-[#7A1C2C] hover:bg-[#FDF2F4]'
+                                    }`}
                                 >
                                     🚚 Calculate Shipping
                                 </button>
                             </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* ═══════════════ PANE 4: SECURE PAYMENT TERMINAL ═══════════════ */}
+            <AnimatePresence>
+                {activePayment && (
+                    <motion.div
+                        initial={{ x: 450, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        exit={{ x: 450, opacity: 0 }}
+                        transition={{ type: "spring", stiffness: 280, damping: 28 }}
+                        className={`w-96 lg:w-[460px] flex flex-col z-30 h-full transition-colors duration-300 ${
+                            darkMode
+                                ? 'bg-dark-surface/95 backdrop-blur-xl border-l border-dark-border'
+                                : 'bg-white/95 backdrop-blur-xl border-l border-[#002F6C]/10 shadow-2xl'
+                        }`}
+                    >
+                        {/* Header */}
+                        <div className={`p-4 flex justify-between items-center border-b transition-colors duration-300 ${
+                            darkMode ? 'border-dark-border' : 'border-gray-100 bg-[#FDF2F4]/30'
+                        }`}>
+                            <div>
+                                <h3 className={`font-bold text-sm uppercase tracking-wider ${darkMode ? 'text-dark-text' : 'text-[#002F6C]'}`}>
+                                    Secure Checkout 🔒
+                                </h3>
+                                <p className={`text-[9px] font-mono mt-0.5 ${darkMode ? 'text-brand-purple' : 'text-[#7A1C2C] font-semibold'}`}>
+                                    REF: {activePayment.orderRef}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setActivePayment(null);
+                                    setPaymentStatus('idle');
+                                }}
+                                className={`p-2 rounded-full transition-colors ${
+                                    darkMode ? 'text-dark-muted hover:text-white hover:bg-white/10' : 'text-gray-400 hover:text-[#7A1C2C] hover:bg-[#FDF2F4]'
+                                }`}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
+                            {/* Check if mock payment url */}
+                            {(() => {
+                                const isMock = activePayment.url.includes('mock-link') || useMock;
+
+                                if (isMock) {
+                                    // ──────── MOCK PAYMENT GATEWAY ────────
+                                    if (paymentStatus === 'processing') {
+                                        return (
+                                            <div className="flex-1 flex flex-col items-center justify-center text-center gap-4">
+                                                <div className="w-16 h-16 border-4 border-brand-purple border-t-transparent rounded-full animate-spin" />
+                                                <div>
+                                                    <h4 className={`font-bold text-base ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>Processing Payment...</h4>
+                                                    <p className={`text-xs mt-1 ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Contacting Kapruka Secure Gateway</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+
+                                    if (paymentStatus === 'success') {
+                                        return (
+                                            <div className="flex-1 flex flex-col items-center justify-center text-center gap-5">
+                                                <motion.div
+                                                    initial={{ scale: 0.5, opacity: 0 }}
+                                                    animate={{ scale: 1, opacity: 1 }}
+                                                    transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                                                    className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center text-white text-4xl shadow-lg shadow-emerald-500/20 animate-glow-pulse"
+                                                >
+                                                    ✓
+                                                </motion.div>
+                                                <div>
+                                                    <h4 className="font-extrabold text-lg text-emerald-500">Payment Successful!</h4>
+                                                    <p className={`text-xs mt-1 max-w-xs ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
+                                                        Your payment of {activePayment.currency} {activePayment.total} has been authorized. Re-routing back to concierge...
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div className="flex flex-col gap-5 flex-1 justify-between h-full">
+                                            <div className="space-y-5">
+                                                {/* Order Summary Mini-card */}
+                                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-dark-card border border-dark-border' : 'bg-gray-50 border border-gray-100'}`}>
+                                                    <h4 className={`text-xs font-bold uppercase tracking-wider mb-2 ${darkMode ? 'text-dark-text' : 'text-[#002F6C]'}`}>Order Summary</h4>
+                                                    <div className="space-y-1.5 text-xs">
+                                                        <div className="flex justify-between">
+                                                            <span className={darkMode ? 'text-dark-muted' : 'text-gray-500'}>Status</span>
+                                                            <span className="text-amber-500 font-bold">Awaiting Payment</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className={darkMode ? 'text-dark-muted' : 'text-gray-500'}>Grand Total</span>
+                                                            <span className={`font-bold ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>
+                                                                {activePayment.currency} {activePayment.total}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Mock Gateway Header */}
+                                                <div className="flex items-center gap-2.5 pb-3 border-b border-dashed border-gray-200 dark:border-dark-border">
+                                                    <span className="text-lg">💳</span>
+                                                    <div>
+                                                        <h4 className={`text-xs font-extrabold uppercase tracking-wide ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>Card Payment Details</h4>
+                                                        <p className={`text-[10px] ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>Simulated Secure Transaction</p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Form Fields */}
+                                                <div className="space-y-4 text-xs">
+                                                    <div>
+                                                        <label className={`block font-semibold mb-1 ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>Cardholder Name</label>
+                                                        <input
+                                                            type="text"
+                                                            value="M Rizmy"
+                                                            readOnly
+                                                            className={`w-full p-3 rounded-xl border font-bold ${
+                                                                darkMode
+                                                                    ? 'bg-dark-card border-dark-border text-dark-text'
+                                                                    : 'bg-gray-100 border-gray-200 text-gray-800'
+                                                            }`}
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className={`block font-semibold mb-1 ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>Card Number</label>
+                                                        <div className="relative">
+                                                            <input
+                                                                type="text"
+                                                                value="4111 2222 3333 4444"
+                                                                readOnly
+                                                                className={`w-full p-3 rounded-xl border font-bold font-mono tracking-widest ${
+                                                                    darkMode
+                                                                        ? 'bg-dark-card border-dark-border text-dark-text'
+                                                                        : 'bg-gray-100 border-gray-200 text-gray-800'
+                                                                }`}
+                                                            />
+                                                            <span className="absolute right-3 top-3.5 text-xs font-bold text-blue-500">VISA</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <label className={`block font-semibold mb-1 ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>Expiry Date</label>
+                                                            <input
+                                                                type="text"
+                                                                value="12/28"
+                                                                readOnly
+                                                                className={`w-full p-3 rounded-xl border font-bold text-center ${
+                                                                    darkMode
+                                                                        ? 'bg-dark-card border-dark-border text-dark-text'
+                                                                        : 'bg-gray-100 border-gray-200 text-gray-800'
+                                                                }`}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className={`block font-semibold mb-1 ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>CVV</label>
+                                                            <input
+                                                                type="password"
+                                                                value="123"
+                                                                readOnly
+                                                                className={`w-full p-3 rounded-xl border font-bold text-center tracking-widest ${
+                                                                    darkMode
+                                                                        ? 'bg-dark-card border-dark-border text-dark-text'
+                                                                        : 'bg-gray-100 border-gray-200 text-gray-800'
+                                                                }`}
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    <div className={`p-3 rounded-xl flex items-center gap-2.5 text-[10px] ${
+                                                        darkMode ? 'bg-emerald-950/20 border border-emerald-900/30 text-emerald-400' : 'bg-emerald-50 border border-emerald-100 text-emerald-800'
+                                                    }`}>
+                                                        <span>🛡️</span>
+                                                        <p className="font-medium">Sandbox Mode Active. Payments are simulated and secure.</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Submit Button */}
+                                            <div className="pt-4">
+                                                <button
+                                                    onClick={() => {
+                                                        setPaymentStatus('processing');
+                                                        setTimeout(() => {
+                                                            setPaymentStatus('success');
+                                                            setTimeout(() => {
+                                                                const newOrder = {
+                                                                    orderRef: activePayment.orderRef,
+                                                                    total: activePayment.total,
+                                                                    currency: activePayment.currency,
+                                                                    date: new Date().toLocaleString()
+                                                                };
+                                                                setPaidOrders(prev => {
+                                                                    const updated = [newOrder, ...prev];
+                                                                    localStorage.setItem('kapruka-orders', JSON.stringify(updated));
+                                                                    return updated;
+                                                                });
+                                                                setActivePayment(null);
+                                                                setPaymentStatus('idle');
+                                                                sendMessage(`I have completed the payment for order ${activePayment.orderRef}. Please track my order.`);
+                                                            }, 1500);
+                                                        }, 2000);
+                                                    }}
+                                                    className="w-full bg-gradient-to-r from-brand-purple to-brand-purple-dark text-white py-4 rounded-xl font-bold uppercase tracking-wider hover:shadow-lg hover:shadow-brand-purple/25 transition-all cursor-pointer text-center"
+                                                >
+                                                    Simulate Payment 🔒
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                } else {
+                                    // ──────── LIVE IFRAME CHECKOUT ────────
+                                    return (
+                                        <div className="flex flex-col gap-4 flex-1 h-full relative">
+                                            <div className={`p-3 rounded-xl flex flex-col gap-1.5 text-[10px] border ${
+                                                darkMode ? 'bg-dark-card border-dark-border text-dark-text' : 'bg-slate-50 border-slate-200 text-slate-700'
+                                            }`}>
+                                                <div className="flex items-center gap-1.5 font-bold">
+                                                    <span>🔒</span>
+                                                    <span>Direct Gateway Secure Frame</span>
+                                                </div>
+                                                <p className="leading-relaxed">
+                                                    Some banks restrict rendering within frames. If this window is blank or payment fails to progress, use the button below to complete it.
+                                                </p>
+                                                <a
+                                                    href={activePayment.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="mt-1 font-bold text-brand-purple hover:underline flex items-center gap-1"
+                                                >
+                                                    Open Checkout In New Window ↗️
+                                                </a>
+                                            </div>
+                                            <div className={`flex-1 rounded-2xl overflow-hidden border ${
+                                                darkMode ? 'border-dark-border bg-black' : 'border-gray-200 bg-white'
+                                            }`}>
+                                                <iframe
+                                                    src={activePayment.url}
+                                                    title="Kapruka Payment Gateway"
+                                                    className="w-full h-full border-none"
+                                                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                            })()}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* ═══════════════ PANE 5: ORDER HISTORY ═══════════════ */}
+            <AnimatePresence>
+                {showHistory && (
+                    <motion.div
+                        initial={{ x: 400, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        exit={{ x: 400, opacity: 0 }}
+                        transition={{ type: "spring", stiffness: 280, damping: 28 }}
+                        className={`w-80 lg:w-[400px] flex flex-col z-30 h-full transition-colors duration-300 ${
+                            darkMode
+                                ? 'bg-dark-surface/95 backdrop-blur-xl border-l border-dark-border'
+                                : 'bg-white/95 backdrop-blur-xl border-l border-[#002F6C]/10 shadow-2xl'
+                        }`}
+                    >
+                        {/* Header */}
+                        <div className={`p-4 flex justify-between items-center border-b transition-colors duration-300 ${
+                            darkMode ? 'border-dark-border' : 'border-gray-100 bg-[#FDF2F4]/30'
+                        }`}>
+                            <h3 className={`font-semibold text-sm uppercase tracking-wider ${darkMode ? 'text-dark-text' : 'text-[#002F6C]'}`}>
+                                Order History
+                            </h3>
+                            <button
+                                onClick={() => setShowHistory(false)}
+                                className={`p-2 rounded-full transition-colors ${
+                                    darkMode ? 'text-dark-muted hover:text-white hover:bg-white/10' : 'text-gray-400 hover:text-[#7A1C2C] hover:bg-[#FDF2F4]'
+                                }`}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
+                            {paidOrders.length === 0 ? (
+                                <div className="flex-1 flex flex-col items-center justify-center text-center gap-4">
+                                    <svg className={`w-20 h-20 mx-auto ${darkMode ? 'text-dark-muted/40' : 'text-brand-purple/20'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                                    </svg>
+                                    <div>
+                                        <h4 className={`font-bold text-base ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>No Orders Found</h4>
+                                        <p className={`text-xs mt-1 max-w-[200px] mx-auto ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
+                                            You haven't made any purchases yet. Your completed orders will appear here.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {paidOrders.map((order, index) => (
+                                        <motion.div
+                                            key={index}
+                                            whileHover={{ y: -2 }}
+                                            className={`p-4 rounded-2xl border transition-all duration-200 ${
+                                                darkMode
+                                                    ? 'bg-dark-card border-dark-border hover:border-brand-purple/40'
+                                                    : 'bg-white border-gray-100 shadow-sm hover:shadow-md'
+                                            }`}
+                                        >
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <span className={`text-[10px] font-mono font-bold uppercase tracking-wider ${darkMode ? 'text-brand-purple' : 'text-brand-purple-dark'}`}>
+                                                        {order.orderRef}
+                                                    </span>
+                                                    <p className={`text-[9px] ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>
+                                                        {order.date}
+                                                    </p>
+                                                </div>
+                                                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400">
+                                                    Paid
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-baseline mt-3 mb-4">
+                                                <span className={`text-xs ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Total Paid</span>
+                                                <span className="text-sm font-extrabold text-brand-purple">
+                                                    {order.currency || 'LKR'} {order.total}
+                                                </span>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    setShowHistory(false);
+                                                    sendMessage(`Track order ${order.orderRef}`);
+                                                }}
+                                                className="w-full py-2 bg-gradient-to-r from-brand-purple to-brand-purple-dark text-white rounded-xl text-[10px] font-bold uppercase tracking-wider hover:shadow-md hover:shadow-brand-purple/20 transition-all duration-200"
+                                            >
+                                                Track Order 🚚
+                                            </button>
+                                        </motion.div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </motion.div>
                 )}
