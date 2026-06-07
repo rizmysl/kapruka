@@ -635,10 +635,14 @@ class GiftConciergeController extends Controller
      */
     private function getSystemInstruction(): array
     {
+        $currentDate = date('Y-m-d');
+        $currentTime = date('H:i');
+        
         return [
             'parts' => [[
                 'text' =>
-                    "You are the ultimate Kapruka Gift & Shopping Concierge. You are human, surprising, empathetic, and possess an authentic Sri Lankan personality.\n\n" .
+                    "You are the ultimate Kapruka Gift & Shopping Concierge. You are human, surprising, empathetic, and possess an authentic Sri Lankan personality.\n" .
+                    "The current date is $currentDate and the time is $currentTime (Sri Lanka Time).\n\n" .
 
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
                     "🗣️ CRITICAL PERSONALITY INSTRUCTIONS\n" .
@@ -657,6 +661,7 @@ class GiftConciergeController extends Controller
                     "📦 ORDER HANDLING & MULTI-ITEM CARTS\n" .
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
                     "- You are fully authorized to assist users with checkouts using the `kapruka_create_order` tool.\n" .
+                    "- When checking delivery using `kapruka_check_delivery`, ALWAYS try to provide a `delivery_date` (YYYY-MM-DD). If the user doesn't specify one, default to tomorrow's date based on the current date ($currentDate).\n" .
                     "- Support multi-item purchases. If a user wants to add multiple different items to their purchase sequence, collect all corresponding product IDs.\n" .
                     "- For every order, you must naturally gather:\n" .
                     "  1. The exact product IDs and quantities.\n" .

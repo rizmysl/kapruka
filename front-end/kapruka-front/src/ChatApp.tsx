@@ -145,6 +145,7 @@ export default function ChatApp() {
     const [isLoading, setIsLoading] = useState(false);
     const [activeProduct, setActiveProduct] = useState<any>(null);
     const [activePayment, setActivePayment] = useState<any>(null);
+    const [iframeLoading, setIframeLoading] = useState(true);
 
     // ── Ghost Typing Indicator for Placeholder ──
     const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -1029,6 +1030,41 @@ export default function ChatApp() {
                                     {msg.tool === 'kapruka_check_delivery' && msg.raw_data && (() => {
                                         const deliveryData = getParsedData(msg.raw_data);
                                         if (!deliveryData) return null;
+
+                                        // Fallback for errors or missing city
+                                        if (deliveryData.text_content || deliveryData.error || deliveryData.reason || deliveryData.available === false && !deliveryData.city) {
+                                            let errorMessage = deliveryData.reason || deliveryData.text_content || deliveryData.error || 'The selected date or city is invalid. Please try again.';
+                                            
+                                            // Attempt to extract cleaner error from raw text_content JSON dumps
+                                            if (typeof errorMessage === 'string') {
+                                                const match = errorMessage.match(/\{.*\}/);
+                                                if (match) {
+                                                    try {
+                                                        const parsed = JSON.parse(match[0]);
+                                                        if (parsed.reason) errorMessage = parsed.reason;
+                                                    } catch(e) {}
+                                                }
+                                                // Clean up common Kapruka MCP prefixes
+                                                errorMessage = errorMessage.replace('Error: Bad request — ', '').replace('. Check your input parameters.', '').trim();
+                                            }
+
+                                            const isHardError = errorMessage.toLowerCase().includes('error') || errorMessage.toLowerCase().includes('invalid');
+                                            
+                                            return (
+                                                <div className={`mt-4 p-4 rounded-xl border flex items-start gap-3 ${
+                                                    isHardError 
+                                                        ? darkMode ? 'bg-red-900/20 border-red-900/50 text-red-400' : 'bg-red-50 border-red-200 text-red-700'
+                                                        : darkMode ? 'bg-amber-900/20 border-amber-900/50 text-amber-400' : 'bg-amber-50 border-amber-200 text-amber-700'
+                                                }`}>
+                                                    <span className="text-xl">⚠️</span>
+                                                    <div>
+                                                        <h4 className="font-bold text-sm">{isHardError ? 'Delivery Check Failed' : 'Delivery Notice'}</h4>
+                                                        <p className="text-xs mt-1 leading-relaxed opacity-90">{errorMessage}</p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
                                         return (
                                             <motion.div
                                                 initial={{ opacity: 0, scale: 0.95 }}
@@ -1593,6 +1629,7 @@ export default function ChatApp() {
                                 onClick={() => {
                                     setActivePayment(null);
                                     setPaymentStatus('idle');
+                                    setIframeLoading(true);
                                 }}
                                 className={`p-2 rounded-full transition-colors ${
                                     darkMode ? 'text-dark-muted hover:text-white hover:bg-white/10' : 'text-gray-400 hover:text-[#7A1C2C] hover:bg-[#FDF2F4]'
@@ -1884,14 +1921,21 @@ export default function ChatApp() {
                                                     Open Checkout In New Window ↗️
                                                 </a>
                                             </div>
-                                            <div className={`flex-1 rounded-2xl overflow-hidden border ${
+                                            <div className={`flex-1 rounded-2xl overflow-hidden border relative ${
                                                 darkMode ? 'border-dark-border bg-black' : 'border-gray-200 bg-white'
                                             }`}>
+                                                {iframeLoading && (
+                                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 dark:bg-black/80 backdrop-blur-sm z-10">
+                                                        <div className="w-10 h-10 border-4 border-brand-purple border-t-transparent rounded-full animate-spin" />
+                                                        <p className="mt-4 text-xs font-bold text-gray-500 dark:text-dark-muted animate-pulse">Loading Secure Gateway...</p>
+                                                    </div>
+                                                )}
                                                 <iframe
                                                     src={activePayment.url}
                                                     title="Kapruka Payment Gateway"
-                                                    className="w-full h-full border-none"
+                                                    className={`w-full h-full border-none transition-opacity duration-500 ${iframeLoading ? 'opacity-0' : 'opacity-100'}`}
                                                     sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                                                    onLoad={() => setIframeLoading(false)}
                                                 />
                                             </div>
                                         </div>
