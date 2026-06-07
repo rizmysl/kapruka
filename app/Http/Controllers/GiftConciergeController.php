@@ -289,14 +289,79 @@ class GiftConciergeController extends Controller
 
     // ... rest of your code remains the same ...
     $result = $llmResponse->json();
-    if (isset($result['candidates'][0]['content']['parts'][0]['functionCall'])) {
-        $functionCall = $result['candidates'][0]['content']['parts'][0]['functionCall'];
-        $toolName = $functionCall['name'];
-        $arguments = $functionCall['args'];
+    $parts = $result['candidates'][0]['content']['parts'] ?? [];
+
+    $toolCalls = [];
+    foreach ($parts as $part) {
+        if (isset($part['functionCall'])) {
+            $toolCalls[] = $part['functionCall'];
+        }
+    }
+
+    if (count($toolCalls) > 0) {
+        // If they are ALL kapruka_search_products, we can merge them
+        $allSearches = true;
+        foreach ($toolCalls as $tc) {
+            if ($tc['name'] !== 'kapruka_search_products') {
+                $allSearches = false;
+                break;
+            }
+        }
+
+        if ($allSearches && count($toolCalls) > 1) {
+            $mergedResults = [];
+            $toolName = 'kapruka_search_products';
+            $mergedArguments = ['q' => ''];
+            $cleanPayloadObj = [];
+
+            foreach ($toolCalls as $idx => $tc) {
+                $args = $tc['args'] ?? [];
+                $rawRes = $this->executeNodeTool($tc['name'], $args);
+                $cleanRes = $this->extractToolPayload($rawRes);
+                
+                if ($idx === 0) {
+                    $cleanPayloadObj = $cleanRes; // Start with the first clean payload
+                    $mergedArguments['q'] .= $args['q'] ?? '';
+                } else {
+                    $mergedArguments['q'] .= ' & ' . ($args['q'] ?? '');
+                }
+                
+                if (isset($cleanRes['results']) && is_array($cleanRes['results'])) {
+                    $mergedResults = array_merge($mergedResults, $cleanRes['results']);
+                }
+            }
+            
+            if (!empty($cleanPayloadObj)) {
+                // Deduplicate merged results by ID
+                $uniqueResults = [];
+                $ids = [];
+                foreach ($mergedResults as $item) {
+                    if (isset($item['id']) && !in_array($item['id'], $ids)) {
+                        $ids[] = $item['id'];
+                        $uniqueResults[] = $item;
+                    }
+                }
+                $cleanPayloadObj['results'] = $uniqueResults;
+                // Remove 'no products found' text if we successfully merged products
+                if (count($uniqueResults) > 0) {
+                    $cleanPayloadObj['text_content'] = "Merged " . count($uniqueResults) . " products";
+                }
+
+                // Since we manually extracted and merged it, we can pass $cleanPayloadObj directly. 
+                // finalizeAIResponse handles clean payloads gracefully via the fallback in extractToolPayload.
+                $finalResponse = $this->finalizeAIResponse($userMessage, $history, $toolName, $mergedArguments, $cleanPayloadObj);
+                return response()->json($finalResponse);
+            }
+        }
+
+        // Fallback: Just execute the first tool call
+        $toolName = $toolCalls[0]['name'];
+        $arguments = $toolCalls[0]['args'] ?? [];
         $toolResult = $this->executeNodeTool($toolName, $arguments);
         $finalResponse = $this->finalizeAIResponse($userMessage, $history, $toolName, $arguments, $toolResult);
         return response()->json($finalResponse);
     }
+    
     return response()->json(['text' => $result['candidates'][0]['content']['parts'][0]['text'] ?? 'No text generated.']);
 }
 
@@ -749,6 +814,7 @@ class GiftConciergeController extends Controller
                     "- After a tool call: write ONLY 1-3 friendly, conversational sentences in the active language. The UI renders all data visually.\n" .
                     "- IMPORTANT: If a tool response indicates an error, or if NO products are found, apologize politely and suggest alternative keywords or a broader search. Do NOT confidently say \"Here are your results\" if the array is empty!\n" .
                     "- Search Guardrails: Extract ONLY the core single noun (e.g., 'delicious chocolate cake for birthday' → 'cake'). Never include prices or adjectives in searches.\n" .
+                    "- Parallel Function Calling: If the user asks for multiple distinct items (e.g., 'cakes, chocolates, and gifts'), you MUST emit multiple parallel `kapruka_search_products` tool calls simultaneously in the same response! Our backend is explicitly designed to merge parallel searches.\n" .
                     "- If you feel like pasting JSON — STOP. Write a warm sentence instead."
             ]]
         ];
