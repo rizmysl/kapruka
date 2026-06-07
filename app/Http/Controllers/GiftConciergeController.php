@@ -657,6 +657,11 @@ class GiftConciergeController extends Controller
 
         if (is_array($cleanPayload)) {
             $cleanPayload['lang'] = $lang;
+            if ($toolName === 'kapruka_create_order') {
+                $cleanPayload['cart'] = $arguments['cart'] ?? [];
+                $cleanPayload['recipient'] = $arguments['recipient'] ?? null;
+                $cleanPayload['delivery'] = $arguments['delivery'] ?? null;
+            }
         }
 
         return [

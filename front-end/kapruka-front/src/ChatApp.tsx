@@ -706,6 +706,12 @@ export default function ChatApp() {
             {/* ═══════════════ PANE 2: CHAT FEED ═══════════════ */}
             <div className="flex-1 flex flex-col relative h-full noise-bg">
 
+                {/* ── Global Alert Bar ── */}
+                <div className="w-full bg-red-600 dark:bg-red-900/40 text-white text-center py-1.5 px-4 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 z-20 relative">
+                    <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-300 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-red-100"></span></span>
+                    Order within <span className="font-mono bg-black/20 px-1 rounded">02:15:34</span> for same-day delivery
+                </div>
+
                 {/* ── Desktop Header Bar ── */}
                 <div className={`hidden md:flex items-center justify-between px-6 py-3 border-b z-10 transition-colors duration-300 ${
                     darkMode
@@ -987,43 +993,19 @@ export default function ChatApp() {
                                     </div>
                                     
                                     {/* Trust Indicators */}
-                                    <div className="flex flex-wrap justify-center gap-4 md:gap-8 mt-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-yellow-400 text-lg">⭐⭐⭐⭐⭐</span>
-                                            <span className={`text-xs font-bold uppercase tracking-wider ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>Rated by Customers</span>
+                                    <div className={`flex flex-wrap justify-center items-center gap-3 md:gap-6 mt-4 text-[11px] font-semibold tracking-wider ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-[10px] opacity-70">⭐</span> <span>RATED BY CUSTOMERS</span>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-lg ${darkMode ? 'text-brand-purple-accent' : 'text-[#002F6C]'}`}>🚚</span>
-                                            <span className={`text-xs font-bold uppercase tracking-wider ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>Same-Day Delivery</span>
+                                        <div className={`w-1 h-1 rounded-full ${darkMode ? 'bg-dark-border' : 'bg-gray-300'}`}></div>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-[10px] opacity-70">🚚</span> <span>SAME-DAY DELIVERY</span>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-lg ${darkMode ? 'text-brand-purple-accent' : 'text-[#002F6C]'}`}>🎁</span>
-                                            <span className={`text-xs font-bold uppercase tracking-wider ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>5,000+ Delivered</span>
+                                        <div className={`w-1 h-1 rounded-full ${darkMode ? 'bg-dark-border' : 'bg-gray-300'}`}></div>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-[10px] opacity-70">🎁</span> <span>5,000+ DELIVERED</span>
                                         </div>
                                     </div>
-                                    
-                                    {/* Urgency Countdown */}
-                                    <div className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50">
-                                        <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span></span>
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-red-700 dark:text-red-400">Order within <span className="font-mono">02:15:34</span> for same-day delivery</span>
-                                    </div>
-                                </motion.div>
-
-                                {/* Concierge Welcome Card */}
-                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className={`w-full max-w-2xl p-6 md:p-8 text-left rounded-3xl border relative overflow-hidden group shadow-xl ${
-                                    darkMode ? 'bg-gradient-to-br from-dark-card to-black border-dark-border' : 'bg-gradient-to-br from-white to-gray-50 border-gray-200'
-                                }`}>
-                                    <div className="absolute top-0 left-0 w-2 h-full bg-brand-purple"></div>
-                                    <h3 className={`text-2xl font-bold mb-4 flex items-center flex-wrap gap-3 ${darkMode ? 'text-dark-text' : 'text-gray-900'}`}>
-                                        {translations[currentLang].welcomeTitle} <span className="text-sm font-normal text-brand-purple bg-brand-purple/10 px-3 py-1 rounded-full border border-brand-purple/20">{translations[currentLang].welcomeSub}</span>
-                                    </h3>
-                                    <p className={`text-sm mb-4 leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>{translations[currentLang].welcomeTellMe}</p>
-                                    <ul className={`text-sm space-y-3 mb-6 pl-2 ${darkMode ? 'text-dark-muted' : 'text-gray-700'}`}>
-                                        <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-brand-purple"></span>{translations[currentLang].welcomeOccasion}</li>
-                                        <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-brand-purple"></span>{translations[currentLang].welcomeBudget}</li>
-                                        <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-brand-purple"></span>{translations[currentLang].welcomeDelivery}</li>
-                                    </ul>
-                                    <p className={`text-sm font-bold ${darkMode ? 'text-brand-purple-accent' : 'text-brand-purple'}`}>{translations[currentLang].welcomeFooter}</p>
                                 </motion.div>
 
                                 {/* Customer-Focused Benefits */}
@@ -1487,12 +1469,51 @@ export default function ChatApp() {
                                                 <div className="z-10 w-full">
                                                     <h4 className="font-extrabold text-xl tracking-tight">Order Created!</h4>
                                                     {orderRef && (
-                                                        <p className="text-[9px] text-brand-purple mt-1 font-mono uppercase tracking-widest font-bold">
+                                                        <p className="text-[10px] text-white/90 bg-white/10 px-2.5 py-1 rounded-md mt-1.5 font-mono uppercase tracking-widest font-bold inline-block border border-white/20">
                                                             Ref: {orderRef}
                                                         </p>
                                                     )}
+                                                    {(() => {
+                                                        const items = orderData.items || orderData.cart || orderData.products;
+                                                        if (!items || !items.length) return null;
+                                                        return (
+                                                            <div className="w-full mt-4 bg-white/5 p-4 rounded-2xl border border-white/10 text-left text-xs space-y-2">
+                                                                <h5 className="font-bold text-white/80 mb-2 uppercase tracking-widest text-[10px]">Order Items</h5>
+                                                                <div className="space-y-2">
+                                                                    {items.map((item: any, idx: number) => (
+                                                                        <div key={idx} className="flex justify-between items-start gap-2 text-white/70">
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <p className="truncate">{item.qty || item.quantity || 1}x {item.name || item.product_name || item.product_id}</p>
+                                                                            </div>
+                                                                            {(item.price || item.unit_price) && (
+                                                                                <div className="whitespace-nowrap">
+                                                                                    {currency} {((item.price || item.unit_price) * (item.qty || item.quantity || 1)).toLocaleString()}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                    {(() => {
+                                                        const addr = orderData.shipping_address || orderData.shipping || orderData.delivery || orderData.recipient;
+                                                        if (!addr) return null;
+                                                        const name = addr.name || addr.recipient_name || (orderData.recipient && orderData.recipient.name);
+                                                        const phone = addr.phone || addr.contact || (orderData.recipient && orderData.recipient.phone);
+                                                        return (
+                                                            <div className="w-full mt-2 bg-white/5 p-4 rounded-2xl border border-white/10 text-left text-xs">
+                                                                <h5 className="font-bold text-white/80 mb-2 uppercase tracking-widest text-[10px]">Shipping To</h5>
+                                                                {name && <p className="text-white/70 font-semibold">{name}</p>}
+                                                                {(addr.line1 || addr.address || addr.address_line_1) && <p className="text-white/60">{addr.line1 || addr.address || addr.address_line_1}</p>}
+                                                                {addr.city && <p className="text-white/60">{addr.city}</p>}
+                                                                {phone && <p className="text-white/60 mt-1">{phone}</p>}
+                                                                {addr.date && <p className="text-white/60 mt-1 font-bold">On: {addr.date}</p>}
+                                                            </div>
+                                                        );
+                                                    })()}
                                                     {orderData.summary && (
-                                                        <div className="my-4 bg-white/5 p-4 rounded-2xl border border-white/10 text-left text-xs space-y-2">
+                                                        <div className="w-full my-2 bg-white/5 p-4 rounded-2xl border border-white/10 text-left text-xs space-y-2">
                                                             <div className="flex justify-between text-white/70">
                                                                 <span>Items Total</span>
                                                                 <span>{currency} {orderData.summary.items_total}</span>
@@ -1502,7 +1523,7 @@ export default function ChatApp() {
                                                                 <span>{currency} {orderData.summary.delivery_fee}</span>
                                                             </div>
                                                             <div className="h-px bg-white/10 my-1" />
-                                                            <div className="flex justify-between font-bold text-sm text-brand-purple">
+                                                            <div className="flex justify-between font-black text-sm text-white bg-white/10 p-2 rounded-lg mt-2">
                                                                 <span>Grand Total</span>
                                                                 <span>{currency} {total}</span>
                                                             </div>
@@ -1740,7 +1761,7 @@ export default function ChatApp() {
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: 10 }}
-                                className="flex flex-col gap-2 mb-3 mt-1"
+                                className="flex flex-col gap-2 mb-4 mt-8"
                             >
                                 <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1 items-center">
                                     <span className={`text-[10px] font-bold uppercase tracking-widest whitespace-nowrap mr-2 ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>Popular:</span>
