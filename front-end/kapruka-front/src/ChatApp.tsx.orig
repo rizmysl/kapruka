@@ -20,13 +20,6 @@ interface Message {
   raw_data?: RawData;
 }
 
-interface ChatSession {
-  id: string;
-  title: string;
-  messages: Message[];
-  createdAt: number;
-}
-
 // Safely parse and normalize tool output data from the backend.
 const getParsedData = (rawData: any): any => {
   if (!rawData) return null;
@@ -64,132 +57,11 @@ const MoonIcon = () => (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
   </svg>
 );
-const EditIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-);
-const ChatIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-);
-const HelpIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>
-);
-const HistoryIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
-);
-const CategoriesIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
-);
-const CartIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
-);
-const TrashIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-);
-
-const WELCOME_MSG: Message = { role: 'bot', text: "Ayubowan! ✨ I'm your Colombo Gift Concierge — powered by AI and the Kapruka catalog. Tell me who you're shopping for, and I'll find the perfect gift!" };
 
 export default function ChatApp() {
-    // ── Chat sessions ──
-    const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('kapruka-sessions');
-            if (saved) return JSON.parse(saved);
-        }
-        const initial: ChatSession = { id: Date.now().toString(), title: 'Chat 1', messages: [WELCOME_MSG], createdAt: Date.now() };
-        return [initial];
-    });
-    const [activeSessionId, setActiveSessionId] = useState<string>(() => {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('kapruka-sessions');
-            if (saved) {
-                const sessions: ChatSession[] = JSON.parse(saved);
-                return sessions[0]?.id || Date.now().toString();
-            }
-        }
-        return Date.now().toString();
-    });
-
-    const activeSession = chatSessions.find(s => s.id === activeSessionId) || chatSessions[0];
-    const messages = activeSession?.messages || [WELCOME_MSG];
-
-    const setMessages = (updaterOrMessages: Message[] | ((prev: Message[]) => Message[])) => {
-        setChatSessions(prev => {
-            const updated = prev.map(s => {
-                if (s.id !== activeSessionId) return s;
-                const newMessages = typeof updaterOrMessages === 'function'
-                    ? updaterOrMessages(s.messages)
-                    : updaterOrMessages;
-                // Auto-update session title from first user message
-                const firstUser = newMessages.find(m => m.role === 'user');
-                const title = firstUser ? firstUser.text.slice(0, 28) + (firstUser.text.length > 28 ? '…' : '') : s.title;
-                return { ...s, messages: newMessages, title };
-            });
-            // Only persist sessions that have at least one user message
-            const toSave = updated.filter(s => s.messages.some(m => m.role === 'user'));
-            localStorage.setItem('kapruka-sessions', JSON.stringify(toSave));
-            return updated;
-        });
-    };
-
-    const startNewChat = () => {
-        // If the current session has no user messages, just reset it instead of creating a blank duplicate
-        const currentHasMessages = activeSession?.messages.some(m => m.role === 'user');
-        if (!currentHasMessages) {
-            setActiveProduct(null);
-            setActivePayment(null);
-            setShowHelp(false);
-            setShowHistory(false);
-            return;
-        }
-        const newId = Date.now().toString();
-        const newSession: ChatSession = {
-            id: newId,
-            title: `Chat ${chatSessions.filter(s => s.messages.some(m => m.role === 'user')).length + 1}`,
-            messages: [WELCOME_MSG],
-            createdAt: Date.now(),
-        };
-        const updated = [newSession, ...chatSessions];
-        setChatSessions(updated);
-        // Don't save the new empty session — it will be saved once the user sends a message
-        setActiveSessionId(newId);
-        setActiveProduct(null);
-        setActivePayment(null);
-        setShowHelp(false);
-        setShowHistory(false);
-    };
-
-    const switchSession = (id: string) => {
-        setActiveSessionId(id);
-        setActiveProduct(null);
-        setActivePayment(null);
-        setShowHelp(false);
-        setShowHistory(false);
-    };
-
-    const deleteSession = (e: React.MouseEvent, id: string) => {
-        e.stopPropagation();
-        setChatSessions(prev => {
-            const updated = prev.filter(s => s.id !== id);
-            localStorage.setItem('kapruka-sessions', JSON.stringify(updated.filter(s => s.messages.some(m => m.role === 'user'))));
-            
-            if (activeSessionId === id) {
-                if (updated.length > 0) {
-                    setActiveSessionId(updated[0].id);
-                } else {
-                    const newId = Date.now().toString();
-                    updated.push({
-                        id: newId,
-                        title: 'Chat 1',
-                        messages: [WELCOME_MSG],
-                        createdAt: Date.now(),
-                    });
-                    setActiveSessionId(newId);
-                }
-            }
-            return updated;
-        });
-    };
-
+    const [messages, setMessages] = useState<Message[]>([
+        { role: 'bot', text: "Ayubowan! ✨ I'm your Colombo Gift Concierge — powered by AI and the Kapruka catalog. Tell me who you're shopping for, and I'll find the perfect gift!" }
+    ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [activeProduct, setActiveProduct] = useState<any>(null);
@@ -210,46 +82,7 @@ export default function ChatApp() {
         }
         return false;
     });
-
-    // Custom feature states
-    const [showHelp, setShowHelp] = useState(false);
-    const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
-    const [addGreetingCard, setAddGreetingCard] = useState(false);
-    const [cardOccasion, setCardOccasion] = useState('Birthday');
-    const [cardMessage, setCardMessage] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const [cart, setCart] = useState<any[]>([]);
-
-    const addToCart = (product: any) => {
-        setCart(prev => {
-            const exists = prev.find(p => p.id === product.id);
-            if (exists) return prev.map(p => p.id === product.id ? { ...p, qty: p.qty + 1 } : p);
-            return [...prev, { ...product, qty: 1 }];
-        });
-    };
-
-    const faqs = [
-        {
-            q: "How do I find a product?",
-            a: "You can search by typing queries like 'Show me chocolate cakes', 'Look for teddy bears', or 'Do you have red roses?'. The AI will search Kapruka's catalog and display a rich interactive grid."
-        },
-        {
-            q: "Can I check if delivery is available to my town?",
-            a: "Yes! You can ask 'Check delivery to Colombo 04' or click the 'Calculate Shipping' button on any product inspect panel. The concierge will check the flat rate and delivery date."
-        },
-        {
-            q: "How do I place an order?",
-            a: "Just tell the AI 'I want to buy SOFTTOY001218' or click the 'Buy' button. The concierge will ask for the required delivery fields (Recipient Name, Address, Sender Name, Date) and generate a secure checkout card."
-        },
-        {
-            q: "What payment methods are supported?",
-            a: "Kapruka checkout supports Visa, MasterCard, AMEX, and local mobile wallets. You can pay directly via our secure in-app checkout panel or open the payment link in a new tab."
-        },
-        {
-            q: "How can I track my order status?",
-            a: "Go to your 'Order History' in the sidebar and click 'Track Order', or ask the AI directly: 'Track order KAPRUKA-12345'."
-        }
-    ];
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -316,106 +149,34 @@ export default function ChatApp() {
                     </p>
                 </div>
 
-                {/* New Chat Button */}
-                <div className="px-3 mt-4">
-                    <button
-                        onClick={startNewChat}
-                        className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 border ${
-                            darkMode
-                                ? 'bg-brand-purple/15 border-brand-purple/30 text-brand-purple hover:bg-brand-purple/25'
-                                : 'bg-white/15 border-white/30 text-white hover:bg-white/25'
-                        }`}
-                    >
-                        <span className="flex items-center justify-center text-sm"><EditIcon /></span> New Chat
-                    </button>
-                </div>
-
                 {/* Nav */}
-                <nav className="px-3 mt-4 space-y-1">
-                    <button onClick={() => { setShowHelp(false); setShowHistory(false); setActiveProduct(null); setActivePayment(null); }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 text-left cursor-pointer ${
-                            !showHelp && !showHistory && !activeProduct && !activePayment
+                <nav className="flex-1 px-3 mt-6 space-y-1">
+                    <button onClick={() => { setShowHistory(false); setActiveProduct(null); setActivePayment(null); }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 text-left cursor-pointer ${
+                            !showHistory && !activeProduct && !activePayment
                                 ? darkMode ? 'bg-brand-purple/10 text-brand-purple' : 'bg-white/10 text-white'
                                 : darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
                         }`}
                     >
-                        <span className="flex items-center justify-center"><ChatIcon /></span> Active Chat
+                        <span className="text-base">💬</span> Active Chat
                     </button>
-                    <button onClick={() => { setShowHelp(true); setShowHistory(false); setActiveProduct(null); setActivePayment(null); }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left cursor-pointer ${
-                            showHelp
-                                ? darkMode ? 'bg-brand-purple/10 text-brand-purple' : 'bg-white/10 text-white'
-                                : darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
-                        }`}
-                    >
-                        <span className="flex items-center justify-center"><HelpIcon /></span> How to Use
-                    </button>
-                    <button onClick={() => { setShowHelp(false); setShowHistory(true); setActiveProduct(null); setActivePayment(null); }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left cursor-pointer ${
+                    <button onClick={() => { setShowHistory(true); setActiveProduct(null); setActivePayment(null); }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-left cursor-pointer ${
                             showHistory
                                 ? darkMode ? 'bg-brand-purple/10 text-brand-purple' : 'bg-white/10 text-white'
                                 : darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
                         }`}
                     >
-                        <span className="flex items-center justify-center"><HistoryIcon /></span> Order History
+                        <span className="text-base">📦</span> Order History
                     </button>
-                    <button onClick={() => { setShowHelp(false); setShowHistory(false); setActiveProduct(null); setActivePayment(null); sendMessage("Show me all categories"); }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left cursor-pointer ${
+                    <button onClick={() => { setShowHistory(false); setActiveProduct(null); setActivePayment(null); sendMessage("Show me all categories"); }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-left cursor-pointer ${
                             darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
                         }`}
                     >
-                        <span className="flex items-center justify-center"><CategoriesIcon /></span> Categories
+                        <span className="text-base">🗂️</span> Categories
                     </button>
                 </nav>
-
-                {/* Chat Session History */}
-                <div className="flex-1 overflow-y-auto px-3 mt-4 min-h-0">
-                    <p className={`text-[9px] font-bold tracking-[0.2em] uppercase px-1 mb-2 ${darkMode ? 'text-dark-muted' : 'text-white/40'}`}>
-                        Chat History
-                    </p>
-                    <div className="space-y-0.5">
-                        {chatSessions.filter(s => s.messages.some(m => m.role === 'user')).map(session => (
-                            <div
-                                key={session.id}
-                                onClick={() => switchSession(session.id)}
-                                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all duration-200 group cursor-pointer ${
-                                    session.id === activeSessionId
-                                        ? darkMode ? 'bg-brand-purple/15 border border-brand-purple/25' : 'bg-white/15 border border-white/20'
-                                        : darkMode ? 'hover:bg-white/5' : 'hover:bg-white/8'
-                                }`}
-                            >
-                                <span className={`flex items-center justify-center flex-shrink-0 ${
-                                    session.id === activeSessionId
-                                        ? darkMode ? 'text-brand-purple' : 'text-white'
-                                        : darkMode ? 'text-dark-muted' : 'text-white/40'
-                                }`}><ChatIcon /></span>
-                                <div className="flex-1 min-w-0">
-                                    <p className={`text-xs font-medium truncate ${
-                                        session.id === activeSessionId
-                                            ? darkMode ? 'text-dark-text' : 'text-white'
-                                            : darkMode ? 'text-dark-muted group-hover:text-dark-text' : 'text-white/50 group-hover:text-white/80'
-                                    }`}>{session.title}</p>
-                                    <p className={`text-[9px] truncate mt-0.5 ${
-                                        darkMode ? 'text-dark-muted/60' : 'text-white/30'
-                                    }`}>{session.messages.length - 1} message{session.messages.length !== 2 ? 's' : ''}</p>
-                                </div>
-                                <button
-                                    onClick={(e) => deleteSession(e, session.id)}
-                                    className={`p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity ${
-                                        darkMode ? 'text-red-400 hover:bg-red-500/20' : 'text-red-500 hover:bg-red-100'
-                                    }`}
-                                >
-                                    <TrashIcon />
-                                </button>
-                                {session.id === activeSessionId && (
-                                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ml-1 ${
-                                        darkMode ? 'bg-brand-purple' : 'bg-white'
-                                    }`} />
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
 
                 {/* Preferences Header */}
                 <p className={`text-[9px] font-bold tracking-[0.2em] uppercase px-4 mb-2 ${darkMode ? 'text-dark-muted' : 'text-white/40'}`}>
@@ -489,190 +250,19 @@ export default function ChatApp() {
             {/* ═══════════════ PANE 2: CHAT FEED ═══════════════ */}
             <div className="flex-1 flex flex-col relative h-full noise-bg">
 
-                {/* ── Desktop Header Bar ── */}
-                <div className={`hidden md:flex items-center justify-between px-6 py-3 border-b z-10 transition-colors duration-300 ${
-                    darkMode
-                        ? 'bg-dark-surface/60 backdrop-blur border-dark-border'
-                        : 'bg-white/70 backdrop-blur border-gray-100 shadow-sm'
-                }`}>
-                    {/* Left: active chat info */}
-                    <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-sm ${
-                            darkMode ? 'bg-brand-purple/20 text-brand-purple' : 'bg-brand-purple/10 text-brand-purple'
-                        }`}><ChatIcon /></div>
-                        <div>
-                            <p className={`text-sm font-bold leading-tight ${
-                                darkMode ? 'text-dark-text' : 'text-gray-900'
-                            }`}>{activeSession?.title || 'Active Chat'}</p>
-                            <p className={`text-[10px] ${
-                                darkMode ? 'text-dark-muted' : 'text-gray-400'
-                            }`}>{messages.length - 1} message{messages.length !== 2 ? 's' : ''} · {useMock ? '🧪 Mock' : '🔴 Live'}</p>
-                        </div>
-                    </div>
-                    {/* Right: actions */}
-                    <div className="flex items-center gap-2">
-                        <button className={`relative flex items-center justify-center p-2 rounded-lg transition-all duration-200 ${
-                            darkMode
-                                ? 'bg-white/5 text-dark-muted hover:bg-white/10 hover:text-dark-text border border-dark-border'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}>
-                            <span className="flex items-center justify-center"><CartIcon /></span>
-                            {cart.length > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-brand-purple text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow-sm">
-                                    {cart.reduce((total, item) => total + item.qty, 0)}
-                                </span>
-                            )}
-                        </button>
-                        <button
-                            onClick={startNewChat}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                                darkMode
-                                    ? 'bg-white/5 text-dark-muted hover:bg-white/10 hover:text-dark-text border border-dark-border'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-brand-purple hover:text-white'
-                            }`}
-                        >
-                            <span className="flex items-center justify-center"><EditIcon /></span> New Chat
-                        </button>
-                        <button
-                            onClick={() => setDarkMode(!darkMode)}
-                            className={`p-2 rounded-lg transition-all duration-200 ${
-                                darkMode
-                                    ? 'bg-white/5 text-dark-muted hover:bg-white/10 hover:text-dark-text border border-dark-border'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
-                        >
-                            {darkMode ? <SunIcon /> : <MoonIcon />}
-                        </button>
-                    </div>
-                </div>
-
                 {/* Mobile Header */}
                 <div className={`md:hidden p-4 shadow-md z-10 flex justify-between items-center transition-colors duration-300 ${
                     darkMode ? 'bg-dark-surface border-b border-dark-border' : 'bg-[#002F6C]'
                 }`}>
                     <h1 className="text-lg font-bold text-white">Kapruka Concierge</h1>
                     <div className="flex items-center gap-2">
-                        <button className="relative text-white/80 p-2 flex items-center justify-center">
-                            <CartIcon />
-                            {cart.length > 0 && (
-                                <span className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full shadow-sm">
-                                    {cart.reduce((total, item) => total + item.qty, 0)}
-                                </span>
-                            )}
-                        </button>
-                        <button onClick={startNewChat} className="text-white/70 p-2 flex items-center justify-center"><EditIcon /></button>
-                        <button onClick={() => setDarkMode(!darkMode)} className="text-white/80 p-2 flex items-center justify-center">
+                        <button onClick={() => setDarkMode(!darkMode)} className="text-white/80 p-1">
                             {darkMode ? <SunIcon /> : <MoonIcon />}
                         </button>
                     </div>
                 </div>
 
-                {/* Messages / Help View */}
-                {showHelp ? (
-                    <div className="flex-1 flex flex-col overflow-y-auto p-6 md:p-10 space-y-6 relative z-10">
-                        {/* FAQ Header */}
-                        <div className="flex justify-between items-center pb-4 border-b border-gray-200 dark:border-dark-border">
-                            <div>
-                                <h2 className="text-2xl md:text-3xl font-black tracking-tight leading-tight">
-                                    How to Use <span className="bg-gradient-to-r from-brand-purple via-brand-purple-light to-[#A17BD9] bg-clip-text text-transparent">Kapruka Concierge</span>
-                                </h2>
-                                <p className={`text-[10px] font-extrabold tracking-[0.25em] uppercase mt-1 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>
-                                    Frequently Asked Questions &amp; Guide
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => setShowHelp(false)}
-                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
-                                    darkMode
-                                        ? 'bg-white/10 text-white hover:bg-white/20'
-                                        : 'bg-brand-purple text-white hover:opacity-90'
-                                }`}
-                            >
-                                ← Back to Chat
-                            </button>
-                        </div>
-
-                        {/* Welcome Card */}
-                        <div className={`rounded-2xl p-6 border ${
-                            darkMode ? 'bg-brand-purple/10 border-brand-purple/20' : 'bg-gradient-to-br from-brand-purple/5 to-brand-purple-light/10 border-brand-purple/15'
-                        }`}>
-                            <div className="flex items-center gap-4 mb-3">
-                                <div className="w-12 h-12 bg-gradient-to-br from-brand-purple to-brand-purple-light rounded-xl flex items-center justify-center text-2xl shadow-lg shadow-brand-purple/20">
-                                    🎁
-                                </div>
-                                <div>
-                                    <h3 className={`font-bold text-base ${darkMode ? 'text-dark-text' : 'text-gray-900'}`}>Welcome to Kapruka Concierge</h3>
-                                    <p className={`text-xs mt-0.5 ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Your AI-powered gift shopping assistant for Sri Lanka</p>
-                                </div>
-                            </div>
-                            <p className={`text-sm leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>
-                                Simply type what you're looking for in natural language. You can search products, check delivery availability, place orders, and track shipments — all through a conversational interface.
-                            </p>
-                        </div>
-
-                        {/* Example Prompts */}
-                        <div>
-                            <p className={`text-xs font-bold uppercase tracking-widest mb-3 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>Try these examples</p>
-                            <div className="flex flex-wrap gap-2">
-                                {[
-                                    '🎂 Show me birthday cakes',
-                                    '🧸 Find soft toys under LKR 2000',
-                                    '💐 Red rose bouquets',
-                                    '🚚 Check delivery to Kandy',
-                                    '📦 Track order KAPRUKA-12345',
-                                    '🗂️ List all categories'
-                                ].map((prompt, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => { setShowHelp(false); sendMessage(prompt); }}
-                                        className={`px-4 py-2 rounded-full text-xs font-semibold transition-all duration-200 ${
-                                            darkMode
-                                                ? 'bg-white/5 border border-dark-border text-dark-text hover:bg-brand-purple/20 hover:border-brand-purple/40 hover:text-brand-purple'
-                                                : 'bg-white border border-gray-200 text-gray-700 hover:bg-brand-purple hover:text-white hover:border-brand-purple shadow-sm'
-                                        }`}
-                                    >
-                                        {prompt}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* FAQ Accordion */}
-                        <div className="max-w-3xl w-full mx-auto space-y-3 pb-6">
-                            <p className={`text-xs font-bold uppercase tracking-widest mb-3 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>Frequently Asked Questions</p>
-                            {faqs.map((faq, idx) => {
-                                const isExpanded = expandedFaq === idx;
-                                return (
-                                    <div
-                                        key={idx}
-                                        className={`rounded-2xl border overflow-hidden transition-all duration-300 ${
-                                            isExpanded
-                                                ? darkMode ? 'bg-brand-purple/10 border-brand-purple/30' : 'bg-brand-purple/5 border-brand-purple/20'
-                                                : darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple/20' : 'bg-white border-gray-100 hover:border-brand-purple/15 shadow-sm'
-                                        }`}
-                                    >
-                                        <button
-                                            onClick={() => setExpandedFaq(isExpanded ? null : idx)}
-                                            className="w-full flex justify-between items-center px-5 py-4 text-left cursor-pointer"
-                                        >
-                                            <span className={`text-sm font-semibold ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>{faq.q}</span>
-                                            <span className={`text-lg transition-transform duration-300 ml-3 flex-shrink-0 ${isExpanded ? 'rotate-180' : ''} ${darkMode ? 'text-brand-purple' : 'text-brand-purple'}`}>
-                                                ⌄
-                                            </span>
-                                        </button>
-                                        {isExpanded && (
-                                            <div className={`px-5 pb-5 text-sm leading-relaxed ${
-                                                darkMode ? 'text-dark-muted' : 'text-gray-600'
-                                            }`}>
-                                                {faq.a}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                ) : (
+                {/* Messages */}
                 <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-6 relative z-10">
                     <AnimatePresence>
                         {messages.length === 1 ? (
@@ -784,116 +374,62 @@ export default function ChatApp() {
                                         }
 
                                         return (
-                                            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 {searchData.results.map((product: any) => (
                                                     <motion.div
                                                         key={product.id}
-                                                        initial={{ opacity: 0, y: 12 }}
-                                                        animate={{ opacity: 1, y: 0 }}
-                                                        whileHover={{ y: -6, scale: 1.015 }}
-                                                        transition={{ type: 'spring', stiffness: 300, damping: 26 }}
-                                                        className={`rounded-3xl flex flex-col overflow-hidden transition-all duration-300 ${
+                                                        whileHover={{ y: -4, scale: 1.02 }}
+                                                        className={`rounded-2xl p-3 flex flex-col justify-between transition-all duration-200 cursor-pointer ${
                                                             darkMode
-                                                                ? 'bg-dark-card border border-dark-border hover:border-brand-purple/40 shadow-xl hover:shadow-brand-purple/10'
-                                                                : 'bg-white border border-gray-100 shadow-lg hover:shadow-2xl'
+                                                                ? 'bg-dark-card border border-dark-border hover:border-brand-orange/30 hover:shadow-lg hover:shadow-brand-orange/5'
+                                                                : 'bg-white border border-gray-100 shadow-md hover:shadow-xl'
                                                         }`}
                                                     >
-                                                        {/* Image Area */}
-                                                        <div className={`relative h-44 overflow-hidden flex items-center justify-center ${
-                                                            darkMode ? 'bg-dark-bg' : 'bg-gradient-to-br from-gray-50 to-gray-100'
-                                                        }`}>
-                                                            {product.image_url ? (
-                                                                <img
-                                                                    src={product.image_url}
-                                                                    alt={product.name}
-                                                                    className="max-h-full max-w-full object-contain transition-transform duration-500 hover:scale-110"
-                                                                />
-                                                            ) : (
-                                                                <div className="text-4xl opacity-30">🎁</div>
-                                                            )}
-                                                            {/* Gradient overlay at bottom */}
-                                                            <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/20 to-transparent" />
-                                                            {/* Stock badge */}
-                                                            <span className={`absolute top-3 left-3 text-[9px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wide shadow-sm ${
-                                                                product.in_stock
-                                                                    ? 'bg-emerald-500 text-white'
-                                                                    : 'bg-red-500 text-white'
+                                                        <div>
+                                                            <div className={`h-32 rounded-xl overflow-hidden mb-2 relative group flex items-center justify-center ${
+                                                                darkMode ? 'bg-dark-bg' : 'bg-gray-50'
                                                             }`}>
-                                                                {product.in_stock ? '✓ In Stock' : '× Sold Out'}
-                                                            </span>
-                                                            {/* Quick inspect overlay */}
-                                                            <button
-                                                                onClick={() => setActiveProduct(product)}
-                                                                className="absolute top-3 right-3 w-7 h-7 rounded-xl bg-black/30 backdrop-blur-sm text-white text-xs flex items-center justify-center hover:bg-black/50 transition-colors"
-                                                            >
-                                                                🔍
-                                                            </button>
-                                                        </div>
-
-                                                        {/* Content */}
-                                                        <div className="p-4 flex flex-col flex-1">
-                                                            {/* Product ID */}
-                                                            <p className={`text-[9px] font-mono font-bold uppercase tracking-widest mb-1 ${
-                                                                darkMode ? 'text-dark-muted' : 'text-gray-400'
-                                                            }`}>{product.id}</p>
-
-                                                            {/* Name */}
-                                                            <h4 className={`font-bold text-[13px] leading-snug line-clamp-2 flex-1 mb-3 ${
-                                                                darkMode ? 'text-dark-text' : 'text-gray-900'
-                                                            }`}>{product.name}</h4>
-
-                                                            {/* Price row */}
-                                                            <div className="flex items-center justify-between mb-3">
-                                                                <div>
-                                                                    <p className={`text-[9px] font-semibold uppercase tracking-wide ${
-                                                                        darkMode ? 'text-dark-muted' : 'text-gray-400'
-                                                                    }`}>Price</p>
-                                                                    <p className="text-base font-black text-brand-purple">
-                                                                        {product.price?.currency || 'LKR'} {(product.price?.amount || product.price)?.toLocaleString?.() ?? (product.price?.amount || product.price)}
-                                                                    </p>
-                                                                </div>
-                                                                {cart.find(p => p.id === product.id) && (
-                                                                    <span className="text-[9px] px-2 py-1 bg-brand-purple/10 text-brand-purple font-bold rounded-full border border-brand-purple/20">
-                                                                        🛒 ×{cart.find(p => p.id === product.id)?.qty}
-                                                                    </span>
+                                                                {product.image_url ? (
+                                                                    <img src={product.image_url} alt={product.name}
+                                                                        className="max-h-full max-w-full object-contain group-hover:scale-110 transition-transform duration-300" />
+                                                                ) : (
+                                                                    <div className={`w-full h-full flex items-center justify-center text-xs ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>No Image</div>
                                                                 )}
+                                                                <span className={`absolute top-2 right-2 text-[8px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${
+                                                                    product.in_stock
+                                                                        ? darkMode ? 'bg-emerald-900/50 text-emerald-400' : 'bg-green-100 text-green-700'
+                                                                        : darkMode ? 'bg-red-900/50 text-red-400' : 'bg-red-100 text-red-700'
+                                                                }`}>
+                                                                    {product.in_stock ? 'In Stock' : 'Sold Out'}
+                                                                </span>
                                                             </div>
-
-                                                            {/* 3 Action Buttons */}
-                                                            <div className="grid grid-cols-3 gap-1.5">
-                                                                {/* Delivery */}
+                                                            <h4 className={`font-bold text-[11px] line-clamp-2 leading-snug ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>
+                                                                {product.name}
+                                                            </h4>
+                                                        </div>
+                                                        <div className="mt-3">
+                                                            <div className="flex items-baseline justify-between mb-2">
+                                                                <span className="text-xs font-extrabold text-brand-purple">
+                                                                    {product.price?.currency || 'LKR'} {product.price?.amount || product.price}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex gap-1.5">
                                                                 <button
-                                                                    onClick={() => sendMessage(`Check delivery availability for product ${product.id}`)}
-                                                                    className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl text-[9px] font-bold transition-all duration-200 ${
+                                                                    onClick={() => setActiveProduct(product)}
+                                                                    className={`flex-1 py-1.5 rounded-lg text-[9px] font-bold transition-all duration-200 ${
                                                                         darkMode
-                                                                            ? 'bg-white/5 text-dark-muted hover:bg-emerald-900/30 hover:text-emerald-400 border border-dark-border hover:border-emerald-800'
-                                                                            : 'bg-gray-50 text-gray-500 hover:bg-emerald-50 hover:text-emerald-700 border border-gray-100 hover:border-emerald-200'
+                                                                            ? 'bg-white/10 text-white hover:bg-white/20'
+                                                                            : 'bg-[#002F6C] text-white hover:bg-[#001f4d]'
                                                                     }`}
                                                                 >
-                                                                    <span className="text-base">🚚</span>
-                                                                    Delivery
+                                                                    Inspect 🔍
                                                                 </button>
-                                                                {/* Add to Cart */}
-                                                                <button
-                                                                    onClick={() => addToCart(product)}
-                                                                    disabled={!product.in_stock}
-                                                                    className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl text-[9px] font-bold transition-all duration-200 disabled:opacity-40 ${
-                                                                        darkMode
-                                                                            ? 'bg-white/5 text-dark-muted hover:bg-brand-purple/20 hover:text-brand-purple border border-dark-border hover:border-brand-purple/30'
-                                                                            : 'bg-gray-50 text-gray-500 hover:bg-brand-purple/10 hover:text-brand-purple border border-gray-100 hover:border-brand-purple/20'
-                                                                    }`}
-                                                                >
-                                                                    <span className="text-base">🛒</span>
-                                                                    Cart
-                                                                </button>
-                                                                {/* Buy Now */}
                                                                 <button
                                                                     onClick={() => sendMessage(`I would like to checkout and order product ${product.id} (${product.name}). Please help me complete the purchase.`)}
                                                                     disabled={!product.in_stock}
-                                                                    className="flex flex-col items-center gap-1 py-2 px-1 rounded-xl text-[9px] font-bold transition-all duration-200 disabled:opacity-40 bg-gradient-to-br from-brand-purple to-brand-purple-dark text-white hover:shadow-lg hover:shadow-brand-purple/30 hover:opacity-90"
+                                                                    className="flex-1 py-1.5 bg-gradient-to-r from-brand-purple to-brand-purple-dark text-white hover:shadow-lg hover:shadow-brand-purple/20 disabled:opacity-40 rounded-lg text-[9px] font-bold transition-all duration-200"
                                                                 >
-                                                                    <span className="text-base">🛍️</span>
-                                                                    Buy
+                                                                    Buy 🛍️
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -1220,7 +756,6 @@ export default function ChatApp() {
                     )}
                     <div ref={messagesEndRef} />
                 </div>
-                )}
 
                 {/* ── Input Area ── */}
                 <div className="p-4 md:p-6 pt-0 relative z-10">
@@ -1232,7 +767,7 @@ export default function ChatApp() {
                                 exit={{ opacity: 0, y: 10 }}
                                 className="flex gap-2 overflow-x-auto hide-scrollbar pb-3"
                             >
-                                {['🎂 Birthday Cakes', '🧸 Soft Toys', '💐 Flower Bouquets', '🎁 Anniversary Gifts', '🍫 Chocolates', '📱 Electronics', '🚚 Check Delivery', '📦 Track Order', '🗂️ All Categories'].map((chip, index) => (
+                                {['🎂 Birthday Cakes', '🧸 Soft Toys', '💐 Flower Bouquets', '🚚 Check Delivery', '🗂️ All Categories'].map((chip, index) => (
                                     <button
                                         key={index}
                                         onClick={() => sendMessage(chip)}
@@ -1488,7 +1023,7 @@ export default function ChatApp() {
                                                 <div>
                                                     <h4 className="font-extrabold text-lg text-emerald-500">Payment Successful!</h4>
                                                     <p className={`text-xs mt-1 max-w-xs ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
-                                                        Your payment of {activePayment.currency} {(Number(activePayment.total) + (addGreetingCard ? 250 : 0)).toLocaleString()} has been authorized. Re-routing back to concierge...
+                                                        Your payment of {activePayment.currency} {activePayment.total} has been authorized. Re-routing back to concierge...
                                                     </p>
                                                 </div>
                                             </div>
@@ -1506,99 +1041,13 @@ export default function ChatApp() {
                                                             <span className={darkMode ? 'text-dark-muted' : 'text-gray-500'}>Status</span>
                                                             <span className="text-amber-500 font-bold">Awaiting Payment</span>
                                                         </div>
-                                                        {addGreetingCard && (
-                                                            <>
-                                                                <div className="flex justify-between">
-                                                                    <span className={darkMode ? 'text-dark-muted' : 'text-gray-500'}>Greeting Card</span>
-                                                                    <span className="text-brand-purple dark:text-brand-purple-light font-bold">{cardOccasion} (+ LKR 250)</span>
-                                                                </div>
-                                                                {cardMessage && (
-                                                                    <div className={`mt-1 p-2 rounded-lg text-[10px] italic leading-normal border ${
-                                                                        darkMode ? 'bg-white/5 border-white/5 text-dark-muted' : 'bg-white border-gray-100 text-gray-500'
-                                                                    }`}>
-                                                                        "{cardMessage}"
-                                                                    </div>
-                                                                )}
-                                                            </>
-                                                        )}
                                                         <div className="flex justify-between">
                                                             <span className={darkMode ? 'text-dark-muted' : 'text-gray-500'}>Grand Total</span>
                                                             <span className={`font-bold ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>
-                                                                {activePayment.currency} {(Number(activePayment.total) + (addGreetingCard ? 250 : 0)).toLocaleString()}
+                                                                {activePayment.currency} {activePayment.total}
                                                             </span>
                                                         </div>
                                                     </div>
-                                                </div>
-
-                                                {/* Greeting Card Addon Section */}
-                                                <div className={`p-4 rounded-2xl border transition-all duration-300 ${
-                                                    addGreetingCard
-                                                        ? darkMode ? 'bg-brand-purple/10 border-brand-purple/40 shadow-lg' : 'bg-[#FDF2F4] border-[#7A1C2C]/20 shadow-md'
-                                                        : darkMode ? 'bg-dark-card/40 border-dark-border/40' : 'bg-white border-gray-100 shadow-sm'
-                                                }`}>
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-lg">💌</span>
-                                                            <div>
-                                                                <h4 className={`text-xs font-bold ${darkMode ? 'text-dark-text' : 'text-[#002F6C]'}`}>Add Premium Greeting Card</h4>
-                                                                <p className={`text-[10px] ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>Handwritten card with your order (+ LKR 250)</p>
-                                                            </div>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => setAddGreetingCard(!addGreetingCard)}
-                                                            className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${
-                                                                addGreetingCard ? 'bg-brand-purple' : 'bg-gray-300 dark:bg-dark-border'
-                                                            }`}
-                                                        >
-                                                            <motion.div
-                                                                animate={{ x: addGreetingCard ? 20 : 0 }}
-                                                               transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                                                                className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-md"
-                                                            />
-                                                        </button>
-                                                    </div>
-
-                                                    {addGreetingCard && (
-                                                        <motion.div
-                                                            initial={{ opacity: 0, height: 0 }}
-                                                            animate={{ opacity: 1, height: 'auto' }}
-                                                            exit={{ opacity: 0, height: 0 }}
-                                                            className="mt-4 pt-3 border-t border-dashed border-gray-200 dark:border-dark-border/50 space-y-3.5 text-xs"
-                                                        >
-                                                            <div>
-                                                                <label className={`block font-semibold mb-1 ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Occasion</label>
-                                                                <select
-                                                                    value={cardOccasion}
-                                                                    onChange={(e) => setCardOccasion(e.target.value)}
-                                                                    className={`w-full p-2.5 rounded-xl border text-xs focus:ring-2 focus:ring-brand-purple focus:outline-none ${
-                                                                        darkMode ? 'bg-dark-card border-dark-border text-dark-text' : 'bg-white border-gray-200 text-gray-800'
-                                                                    }`}
-                                                                >
-                                                                    <option value="Birthday">Birthday 🎂</option>
-                                                                    <option value="Anniversary">Anniversary 💍</option>
-                                                                    <option value="Love / Valentine">Love / Romance ❤️</option>
-                                                                    <option value="Congratulations">Congratulations 🎉</option>
-                                                                    <option value="Get Well Soon">Get Well Soon 🩹</option>
-                                                                    <option value="Thank You">Thank You 🙏</option>
-                                                                </select>
-                                                            </div>
-
-                                                            <div>
-                                                                <label className={`block font-semibold mb-1 ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Handwritten Message (Optional)</label>
-                                                                <textarea
-                                                                    value={cardMessage}
-                                                                    onChange={(e) => setCardMessage(e.target.value)}
-                                                                    placeholder="Write a custom warm message..."
-                                                                    maxLength={300}
-                                                                    rows={3}
-                                                                    className={`w-full p-2.5 rounded-xl border text-xs focus:ring-2 focus:ring-brand-purple focus:outline-none resize-none ${
-                                                                        darkMode ? 'bg-dark-card border-dark-border text-dark-text' : 'bg-white border-gray-200 text-gray-800'
-                                                                    }`}
-                                                                />
-                                                                <p className="text-[9px] text-right text-gray-400 mt-1">{cardMessage.length} / 300</p>
-                                                            </div>
-                                                        </motion.div>
-                                                    )}
                                                 </div>
 
                                                 {/* Mock Gateway Header */}
@@ -1691,7 +1140,7 @@ export default function ChatApp() {
                                                             setTimeout(() => {
                                                                 const newOrder = {
                                                                     orderRef: activePayment.orderRef,
-                                                                    total: Number(activePayment.total) + (addGreetingCard ? 250 : 0),
+                                                                    total: activePayment.total,
                                                                     currency: activePayment.currency,
                                                                     date: new Date().toLocaleString()
                                                                 };

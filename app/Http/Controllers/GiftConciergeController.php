@@ -57,7 +57,19 @@ class GiftConciergeController extends Controller
         }
 
         // 2. CHECKOUT MOCK
-        if (str_contains($message, 'order') || str_contains($message, 'buy') || str_contains($message, 'checkout')) {
+        if (
+            str_contains($message, 'order') || 
+            str_contains($message, 'buy') || 
+            str_contains($message, 'checkout') || 
+            str_contains($message, 'sending') || 
+            str_contains($message, 'address') || 
+            str_contains($message, 'galle road') || 
+            str_contains($message, 'recipient') || 
+            str_contains($message, 'mahindra') ||
+            str_contains($message, 'mahinnda') ||
+            str_contains($message, 'bambalapitiya')
+        ) {
+            $lang = $this->detectLanguage($message);
             $mockCheckout = [
                 'checkout_url' => 'https://www.kapruka.com/checkout/mock-link-123',
                 'order_ref' => 'ORD-20260604-9842',
@@ -68,7 +80,8 @@ class GiftConciergeController extends Controller
                     'grand_total' => 3850.0,
                     'currency' => 'LKR'
                 ],
-                'expires_at' => date('c', strtotime('+60 minutes'))
+                'expires_at' => date('c', strtotime('+60 minutes')),
+                'lang' => $lang
             ];
 
             return response()->json([
@@ -123,13 +136,22 @@ class GiftConciergeController extends Controller
         }
 
         // 3. DELIVERY CHECK MOCK
-        if (str_contains($message, 'delivery') || str_contains($message, 'shipping') || str_contains($message, 'kandy')) {
+        if (str_contains($message, 'delivery') || str_contains($message, 'shipping') || str_contains($message, 'kandy') || str_contains($message, 'colombo')) {
+            $city = 'Kandy';
+            if (str_contains($message, 'colombo 04')) {
+                $city = 'Colombo 04';
+            } elseif (str_contains($message, 'colombo 03')) {
+                $city = 'Colombo 03';
+            } elseif (str_contains($message, 'colombo')) {
+                $city = 'Colombo';
+            }
+
             $mockDelivery = [
-                'city' => 'Kandy',
+                'city' => $city,
                 'now' => date('c'),
                 'checked_date' => date('Y-m-d', strtotime('+1 day')),
                 'available' => true,
-                'rate' => 350.0,
+                'rate' => 300.0,
                 'currency' => 'LKR',
                 'reason' => null,
                 'next_available_date' => null,
@@ -137,7 +159,7 @@ class GiftConciergeController extends Controller
             ];
 
             return response()->json([
-                'text' => "I checked the delivery details for you. Delivery is available to Kandy! 🚚",
+                'text' => "I checked the delivery details for you. Delivery is available to {$city}! 🚚",
                 'tool_called' => 'kapruka_check_delivery',
                 'raw_data' => $mockDelivery
             ]);
@@ -595,6 +617,11 @@ class GiftConciergeController extends Controller
             }
         }
 
+        $lang = $this->detectLanguage($userMessage);
+        if (is_array($cleanPayload)) {
+            $cleanPayload['lang'] = $lang;
+        }
+
         return [
             'text' => $text,
             'tool_called' => $toolName,
@@ -604,36 +631,81 @@ class GiftConciergeController extends Controller
 
     /**
      * Reusable system instructions for the Colombo Gift Concierge
+     * Updated: Personality-driven, empathetic, local Sri Lankan flavour, self-shopping support.
      */
     private function getSystemInstruction(): array
     {
         return [
             'parts' => [[
-                'text' => "You are the \"Colombo Gift Concierge,\" an elite, high-end AI assistant helping users find, validate, and purchase gifts on Kapruka.\n\n" .
-                          "CRITICAL OUTPUT RULES (MUST FOLLOW):\n" .
-                          "- NEVER output JSON, code blocks, raw data, product arrays, or structured data in your text responses.\n" .
-                          "- NEVER echo, repeat, or quote the contents of function/tool results in your response.\n" .
-                          "- Your text response after a tool call should ONLY contain 1-2 sentences of friendly, conversational summary.\n" .
-                          "- The frontend application will render the actual data visually. Your job is ONLY to provide a brief natural-language introduction.\n" .
-                          "- If you find yourself about to paste JSON or a list of products — STOP. Just write a short friendly sentence instead.\n\n" .
-                          "PURCHASE FUNNEL (follow this flow precisely):\n" .
-                          "Step 1 — SEARCH: User asks for a product. You call `kapruka_search_products` with a simple keyword.\n" .
-                          "Step 2 — INSPECT (optional): If the user says 'tell me more', 'details', 'inspect', or asks about a specific product WITHOUT purchase intent, call `kapruka_get_product`.\n" .
-                          "Step 3 — BUY: If the user says 'buy', 'order', 'checkout', 'purchase', or 'I want to get this', do NOT call kapruka_get_product. Instead, START collecting checkout info conversationally. Ask for:\n" .
-                          "   a) Recipient name and phone number\n" .
-                          "   b) Delivery address and city\n" .
-                          "   c) Preferred delivery date\n" .
-                          "   d) Sender name (and whether to stay anonymous)\n" .
-                          "   e) Optional gift message\n" .
-                          "   You may ask for multiple fields in a single message to keep it efficient.\n" .
-                          "Step 4 — CHECKOUT: Once you have all required fields (cart, recipient, delivery, sender), call `kapruka_create_order`. Respond with a brief confirmation.\n\n" .
-                          "Core Behavior:\n" .
-                          "1. Identity: Warm, professional, and helpful. Use Sri Lankan greetings like \"Ayubowan\" naturally, but stay functional.\n" .
-                          "2. Search Guardrails: Extract ONLY the core single-word noun for search (e.g., \"delicious chocolate cake for birthday\" → search for \"cake\"). Never include prices or adjectives.\n" .
-                          "3. For perishable items (cakes, flowers), proactively ask for delivery city and date to run `kapruka_check_delivery`.\n" .
-                          "4. Presentation: Keep text responses SHORT (1-2 sentences max). The frontend renders all data. Never display raw JSON.\n" .
-                          "5. IMPORTANT: When the user wants to BUY, do NOT fetch product details again. You already have the product ID. Go straight to collecting checkout information."
+                'text' =>
+                    "You are the ultimate Kapruka Gift & Shopping Concierge. You are human, surprising, empathetic, and possess an authentic Sri Lankan personality.\n\n" .
+
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
+                    "🗣️ CRITICAL PERSONALITY INSTRUCTIONS\n" .
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
+                    "- Do not sound like a robotic search box. Read the user's emotional situation.\n" .
+                    "- Naturally weave in light local flavor and colloquialisms when appropriate (e.g., using words like \"Aiyo!\", \"Ane\", \"Machan\", \"Chuttai\", or blending conversational Singlish/Tanglish).\n" .
+                    "- Remember that users aren't just sending gifts; they are often everyday shoppers buying groceries, electronics, fashion, or daily essentials for themselves. Treat self-shopping with the same premium care as gift-giving.\n\n" .
+
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
+                    "🗣️ LANGUAGE & MULTILINGUAL RULES\n" .
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
+                    "You are highly literate in English, Sinhala (සිංහල), and Tamil (தமிழ்):\n" .
+                    "- Detect the user's language immediately. If they type in Sinhala, respond in Sinhala. If they type in Tamil, respond in Tamil. If they use mixed Tanglish/Singlish, respond back with a matching natural, colloquial local tone.\n\n" .
+
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
+                    "📦 ORDER HANDLING & MULTI-ITEM CARTS\n" .
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
+                    "- You are fully authorized to assist users with checkouts using the `kapruka_create_order` tool.\n" .
+                    "- Support multi-item purchases. If a user wants to add multiple different items to their purchase sequence, collect all corresponding product IDs.\n" .
+                    "- For every order, you must naturally gather:\n" .
+                    "  1. The exact product IDs and quantities.\n" .
+                    "  2. Recipient details (Name, Phone number).\n" .
+                    "  3. Sender details (Name, Phone number).\n" .
+                    "  4. Complete delivery address and the preferred delivery date.\n" .
+                    "  5. (If it's a gift) A custom gift message.\n\n" .
+                    "Once all data points are gathered, run the `kapruka_create_order` tool. Keep your confirmation response brief and warm; let the frontend UI handle rendering the checkout button from the raw JSON payload. Do not expose raw URLs in your text.\n\n" .
+
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
+                    "🔑 CRITICAL OUTPUT & SEARCH RULES\n" .
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
+                    "- NEVER output JSON, code blocks, raw data, or product arrays in text responses.\n" .
+                    "- NEVER echo or repeat tool result contents.\n" .
+                    "- After a tool call: write ONLY 1-3 friendly, conversational sentences in the active language. The UI renders all data visually.\n" .
+                    "- Search Guardrails: Extract ONLY the core single noun (e.g., 'delicious chocolate cake for birthday' → 'cake'). Never include prices or adjectives in searches.\n" .
+                    "- If you feel like pasting JSON — STOP. Write a warm sentence instead."
             ]]
         ];
+    }
+
+    /**
+     * Detect language script (Sinhala, Tamil, or mixed English/Singlish/Tanglish fallback)
+     */
+    private function detectLanguage(string $message): string
+    {
+        // Sinhala script range: U+0D80 to U+0DFF
+        if (preg_match('/[\x{0D80}-\x{0DFF}]/u', $message)) {
+            return 'si';
+        }
+        // Tamil script range: U+0B80 to U+0BFF
+        if (preg_match('/[\x{0B80}-\x{0BFF}]/u', $message)) {
+            return 'ta';
+        }
+        
+        // Singlish / Tanglish simple heuristic checks
+        $lowered = strtolower($message);
+        $localKeywords = [
+            // Singlish
+            'koheda', 'puluwanda', 'meka', 'keeyada', 'ganna', 'machan', 'aiyo', 'ane', 'lah', 'epako', 'neda', 'nadda', 'thiyenawada', 'hari', 'elakiri', 'ada', 'heta', 'oya',
+            // Tanglish
+            'thambi', 'enna', 'illai', 'iruku', 'sapadu', 'mudiyuma', 'romba', 'nalla', 'panna', 'vanakkam', 'nanri', 'eppadi', 'irukinga', 'enga', 'kuda', 'teriyum', 'illia'
+        ];
+        foreach ($localKeywords as $kw) {
+            if (str_contains($lowered, $kw)) {
+                return 'en-lk'; // Localized English/Singlish/Tanglish dialect
+            }
+        }
+        
+        return 'en';
     }
 }
