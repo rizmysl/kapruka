@@ -85,8 +85,56 @@ const CartIcon = () => (
 const TrashIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
 );
+const BagIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+);
+const SearchIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+);
+const TruckIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+);
+const CardIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+);
+const SidebarIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+);
 
-const WELCOME_MSG: Message = { role: 'bot', text: "Ayubowan! ✨ I'm your Colombo Gift Concierge — powered by AI and the Kapruka catalog. Tell me who you're shopping for, and I'll find the perfect gift!" };
+const FallbackImageIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+    <polyline points="21 15 16 10 5 21"></polyline>
+  </svg>
+);
+
+const ImageWithFallback = ({ src, alt, className, fallback }: { src?: string, alt?: string, className?: string, fallback: React.ReactNode }) => {
+    const [error, setError] = useState(false);
+    if (!src || error) return <>{fallback}</>;
+    return <img src={src} alt={alt} className={className} onError={() => setError(true)} />;
+};
+
+const getDynamicGreeting = () => {
+    const hour = new Date().getHours();
+    let timeOfDay = 'morning';
+    if (hour >= 12 && hour < 17) timeOfDay = 'afternoon';
+    else if (hour >= 17) timeOfDay = 'evening';
+    
+    const day = new Date().getDay();
+    const isWeekend = day === 0 || day === 6;
+    
+    if (isWeekend && hour < 12) {
+        return "Ayubowan! It's a beautiful weekend morning in Colombo. Looking for the perfect gift?";
+    }
+    
+    return `Ayubowan! Good ${timeOfDay}. Let's find exactly what you need today.`;
+};
+
+const getInitialWelcomeMsg = (): Message => ({ 
+    role: 'bot', 
+    text: `${getDynamicGreeting()} I'm your Colombo Gift Concierge — powered by AI. Tell me who you're shopping for, and I'll find the perfect gift!` 
+});
 
 export default function ChatApp() {
     // ── Chat sessions ──
@@ -95,7 +143,7 @@ export default function ChatApp() {
             const saved = localStorage.getItem('kapruka-sessions');
             if (saved) return JSON.parse(saved);
         }
-        const initial: ChatSession = { id: Date.now().toString(), title: 'Chat 1', messages: [WELCOME_MSG], createdAt: Date.now() };
+        const initial: ChatSession = { id: Date.now().toString(), title: 'Chat 1', messages: [getInitialWelcomeMsg()], createdAt: Date.now() };
         return [initial];
     });
     const [activeSessionId, setActiveSessionId] = useState<string>(() => {
@@ -110,7 +158,7 @@ export default function ChatApp() {
     });
 
     const activeSession = chatSessions.find(s => s.id === activeSessionId) || chatSessions[0];
-    const messages = activeSession?.messages || [WELCOME_MSG];
+    const messages = activeSession?.messages || [getInitialWelcomeMsg()];
 
     const setMessages = (updaterOrMessages: Message[] | ((prev: Message[]) => Message[])) => {
         setChatSessions(prev => {
@@ -145,7 +193,7 @@ export default function ChatApp() {
         const newSession: ChatSession = {
             id: newId,
             title: `Chat ${chatSessions.filter(s => s.messages.some(m => m.role === 'user')).length + 1}`,
-            messages: [WELCOME_MSG],
+            messages: [getInitialWelcomeMsg()],
             createdAt: Date.now(),
         };
         const updated = [newSession, ...chatSessions];
@@ -180,7 +228,7 @@ export default function ChatApp() {
                     updated.push({
                         id: newId,
                         title: 'Chat 1',
-                        messages: [WELCOME_MSG],
+                        messages: [getInitialWelcomeMsg()],
                         createdAt: Date.now(),
                     });
                     setActiveSessionId(newId);
@@ -194,6 +242,39 @@ export default function ChatApp() {
     const [isLoading, setIsLoading] = useState(false);
     const [activeProduct, setActiveProduct] = useState<any>(null);
     const [activePayment, setActivePayment] = useState<any>(null);
+
+    // ── Ghost Typing Indicator for Placeholder ──
+    const [placeholderIndex, setPlaceholderIndex] = useState(0);
+    const [placeholderText, setPlaceholderText] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
+    
+    useEffect(() => {
+        if (input.length > 0) return; // Stop animating if user is typing
+
+        const placeholders = [
+            'Type "Send a birthday cake to Nugegoda by 4 PM"',
+            'Type "What\'s a good anniversary gift?"',
+            'Type "Track my current order"'
+        ];
+        const currentString = placeholders[placeholderIndex];
+        let typingSpeed = isDeleting ? 15 : 40; // Smoother and faster typing
+        
+        if (!isDeleting && placeholderText === currentString) {
+            typingSpeed = 2500; // Pause at end of typing
+            setIsDeleting(true);
+        } else if (isDeleting && placeholderText === '') {
+            setIsDeleting(false);
+            setPlaceholderIndex((prev) => (prev + 1) % placeholders.length);
+            typingSpeed = 500; // Pause before typing next
+        }
+        
+        const timeout = setTimeout(() => {
+            setPlaceholderText(currentString.substring(0, placeholderText.length + (isDeleting ? -1 : 1)));
+        }, typingSpeed);
+        
+        return () => clearTimeout(timeout);
+    }, [placeholderText, isDeleting, placeholderIndex, input]);
+
     const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success'>('idle');
     const [paidOrders, setPaidOrders] = useState<any[]>(() => {
         if (typeof window !== 'undefined') {
@@ -219,6 +300,8 @@ export default function ChatApp() {
     const [cardMessage, setCardMessage] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [cart, setCart] = useState<any[]>([]);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [showCartPanel, setShowCartPanel] = useState(false);
 
     const addToCart = (product: any) => {
         setCart(prev => {
@@ -226,6 +309,19 @@ export default function ChatApp() {
             if (exists) return prev.map(p => p.id === product.id ? { ...p, qty: p.qty + 1 } : p);
             return [...prev, { ...product, qty: 1 }];
         });
+        setShowCartPanel(true);
+    };
+
+    const increaseQty = (id: string) => {
+        setCart(prev => prev.map(item => item.id === id ? { ...item, qty: item.qty + 1 } : item));
+    };
+
+    const decreaseQty = (id: string) => {
+        setCart(prev => prev.map(item => item.id === id ? { ...item, qty: Math.max(1, item.qty - 1) } : item).filter(item => item.qty > 0));
+    };
+
+    const removeFromCart = (id: string) => {
+        setCart(prev => prev.filter(item => item.id !== id));
     };
 
     const faqs = [
@@ -276,15 +372,27 @@ export default function ChatApp() {
             .slice(-20);
 
         try {
-            const response = await fetch('http://localhost:8002/chat/message', {
+            const isDev = import.meta.env.DEV;
+            const apiUrl = isDev ? '/api-proxy/chat/message' : 'http://127.0.0.1:8002/chat/message';
+            const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                 body: JSON.stringify({ message: userText, use_mock: useMock, history })
             });
             const data = await response.json();
+            
+            if (!response.ok) {
+                console.error("Server returned an error:", data);
+                throw new Error(data.message || data.error_body?.error?.message || "Server Error");
+            }
+
             setMessages(prev => [...prev, {
-                role: 'bot', text: data.text, tool: data.tool_called, raw_data: data.raw_data
+                role: 'bot', 
+                text: data.text || "Sorry, I didn't receive a valid text response.", 
+                tool: data.tool_called, 
+                raw_data: data.raw_data
             }]);
+            
             if (data.tool_called === 'kapruka_get_product' && data.raw_data) {
                 setActiveProduct(getParsedData(data.raw_data));
             }
@@ -297,120 +405,165 @@ export default function ChatApp() {
     };
 
     return (
-        <div className={`flex h-screen w-full overflow-hidden font-sans transition-colors duration-300 ${darkMode ? 'bg-dark-bg' : 'bg-gradient-to-br from-[#FDF2F4] via-white to-[#FDF2F4]'}`}>
+        <div className={`flex h-screen w-full overflow-hidden font-sans transition-colors duration-300 ${darkMode ? 'bg-dark-bg' : 'bg-gradient-to-br from-indigo-50 via-white to-purple-50 animate-mesh'}`}>
 
             {/* ═══════════════ PANE 1: SIDEBAR ═══════════════ */}
-            <div className={`w-64 flex flex-col z-20 hidden md:flex transition-colors duration-300 ${
+            <div className={`flex flex-col z-20 hidden md:flex transition-all duration-300 ${
+                sidebarCollapsed ? 'w-16 border-r' : 'w-64 border-r'
+            } ${
                 darkMode
-                    ? 'bg-dark-surface/80 backdrop-blur-xl border-r border-dark-border'
-                    : 'bg-gradient-to-b from-[#002F6C] to-[#001845] shadow-2xl'
+                    ? 'bg-dark-surface/80 backdrop-blur-xl border-dark-border'
+                    : 'bg-gradient-to-b from-[#002F6C] to-[#001845] shadow-2xl border-white/10'
             }`}>
                 {/* Logo */}
-                <div className="p-6 pb-3">
-                    <h1 className="text-2xl font-black tracking-tight flex items-center gap-1">
-                        <span className="gradient-text">K</span>
-                        <span className="text-white">apruka</span>
-                    </h1>
-                    <p className={`text-[10px] mt-1 font-semibold tracking-[0.2em] uppercase ${darkMode ? 'text-dark-muted' : 'text-white/50'}`}>
-                        Gift Concierge · AI
-                    </p>
+                <div className={`p-4 pb-3 flex flex-col items-center justify-between ${sidebarCollapsed ? 'gap-2' : 'flex-row'}`}>
+                    {!sidebarCollapsed ? (
+                        <div>
+                            <h1 className="text-2xl font-black tracking-tight flex items-center gap-1">
+                                <span className="gradient-text">K</span>
+                                <span className="text-white">apruka</span>
+                            </h1>
+                            <p className={`text-[10px] mt-1 font-semibold tracking-[0.2em] uppercase ${darkMode ? 'text-dark-muted' : 'text-white/50'}`}>
+                                Gift Concierge · AI
+                            </p>
+                        </div>
+                    ) : (
+                        <h1 className="text-2xl font-black tracking-tight">
+                            <span className="gradient-text">K</span>
+                        </h1>
+                    )}
+                    <button 
+                        onClick={() => setSidebarCollapsed(!sidebarCollapsed)} 
+                        className={`p-1.5 rounded-lg transition-colors cursor-pointer hidden md:block ${
+                            darkMode ? 'text-dark-muted hover:bg-white/5 hover:text-dark-text' : 'text-white/60 hover:bg-white/10 hover:text-white'
+                        }`}
+                    >
+                        <SidebarIcon />
+                    </button>
                 </div>
 
-                {/* New Chat Button */}
-                <div className="px-3 mt-4">
+                <div className="px-3 mt-4 flex justify-center">
                     <button
                         onClick={startNewChat}
-                        className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 border ${
+                        className={`flex items-center justify-center gap-2 rounded-xl text-xs font-bold transition-all duration-200 border cursor-pointer ${
+                            sidebarCollapsed ? 'p-2.5' : 'w-full px-4 py-2.5'
+                        } ${
                             darkMode
                                 ? 'bg-brand-purple/15 border-brand-purple/30 text-brand-purple hover:bg-brand-purple/25'
                                 : 'bg-white/15 border-white/30 text-white hover:bg-white/25'
                         }`}
+                        title={sidebarCollapsed ? "New Chat" : undefined}
                     >
-                        <span className="flex items-center justify-center text-sm"><EditIcon /></span> New Chat
+                        <span className="flex items-center justify-center text-sm"><EditIcon /></span>
+                        {!sidebarCollapsed && "New Chat"}
                     </button>
                 </div>
 
-                {/* Nav */}
                 <nav className="px-3 mt-4 space-y-1">
                     <button onClick={() => { setShowHelp(false); setShowHistory(false); setActiveProduct(null); setActivePayment(null); }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 text-left cursor-pointer ${
+                        className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                            sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full px-4 text-left'
+                        } ${
                             !showHelp && !showHistory && !activeProduct && !activePayment
                                 ? darkMode ? 'bg-brand-purple/10 text-brand-purple' : 'bg-white/10 text-white'
                                 : darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
                         }`}
+                        title={sidebarCollapsed ? "Active Chat" : undefined}
                     >
-                        <span className="flex items-center justify-center"><ChatIcon /></span> Active Chat
+                        <span className="flex items-center justify-center"><ChatIcon /></span>
+                        {!sidebarCollapsed && "Active Chat"}
                     </button>
                     <button onClick={() => { setShowHelp(true); setShowHistory(false); setActiveProduct(null); setActivePayment(null); }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left cursor-pointer ${
+                        className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
+                            sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full px-4 text-left'
+                        } ${
                             showHelp
                                 ? darkMode ? 'bg-brand-purple/10 text-brand-purple' : 'bg-white/10 text-white'
                                 : darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
                         }`}
+                        title={sidebarCollapsed ? "How to Use" : undefined}
                     >
-                        <span className="flex items-center justify-center"><HelpIcon /></span> How to Use
+                        <span className="flex items-center justify-center"><HelpIcon /></span>
+                        {!sidebarCollapsed && "How to Use"}
                     </button>
                     <button onClick={() => { setShowHelp(false); setShowHistory(true); setActiveProduct(null); setActivePayment(null); }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left cursor-pointer ${
+                        className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
+                            sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full px-4 text-left'
+                        } ${
                             showHistory
                                 ? darkMode ? 'bg-brand-purple/10 text-brand-purple' : 'bg-white/10 text-white'
                                 : darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
                         }`}
+                        title={sidebarCollapsed ? "Order History" : undefined}
                     >
-                        <span className="flex items-center justify-center"><HistoryIcon /></span> Order History
+                        <span className="flex items-center justify-center"><HistoryIcon /></span>
+                        {!sidebarCollapsed && "Order History"}
                     </button>
                     <button onClick={() => { setShowHelp(false); setShowHistory(false); setActiveProduct(null); setActivePayment(null); sendMessage("Show me all categories"); }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left cursor-pointer ${
+                        className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
+                            sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full px-4 text-left'
+                        } ${
                             darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
                         }`}
+                        title={sidebarCollapsed ? "Categories" : undefined}
                     >
-                        <span className="flex items-center justify-center"><CategoriesIcon /></span> Categories
+                        <span className="flex items-center justify-center"><CategoriesIcon /></span>
+                        {!sidebarCollapsed && "Categories"}
                     </button>
                 </nav>
 
                 {/* Chat Session History */}
-                <div className="flex-1 overflow-y-auto px-3 mt-4 min-h-0">
-                    <p className={`text-[9px] font-bold tracking-[0.2em] uppercase px-1 mb-2 ${darkMode ? 'text-dark-muted' : 'text-white/40'}`}>
-                        Chat History
-                    </p>
+                <div className="flex-1 overflow-y-auto px-3 mt-4 min-h-0 hide-scrollbar">
+                    {!sidebarCollapsed && (
+                        <p className={`text-[9px] font-bold tracking-[0.2em] uppercase px-1 mb-2 ${darkMode ? 'text-dark-muted' : 'text-white/40'}`}>
+                            Chat History
+                        </p>
+                    )}
                     <div className="space-y-0.5">
                         {chatSessions.filter(s => s.messages.some(m => m.role === 'user')).map(session => (
                             <div
                                 key={session.id}
                                 onClick={() => switchSession(session.id)}
-                                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all duration-200 group cursor-pointer ${
+                                className={`flex items-center rounded-xl transition-all duration-200 group cursor-pointer ${
+                                    sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full gap-2.5 px-3 py-2.5 text-left'
+                                } ${
                                     session.id === activeSessionId
                                         ? darkMode ? 'bg-brand-purple/15 border border-brand-purple/25' : 'bg-white/15 border border-white/20'
                                         : darkMode ? 'hover:bg-white/5' : 'hover:bg-white/8'
                                 }`}
+                                title={sidebarCollapsed ? session.title : undefined}
                             >
                                 <span className={`flex items-center justify-center flex-shrink-0 ${
                                     session.id === activeSessionId
                                         ? darkMode ? 'text-brand-purple' : 'text-white'
                                         : darkMode ? 'text-dark-muted' : 'text-white/40'
                                 }`}><ChatIcon /></span>
-                                <div className="flex-1 min-w-0">
-                                    <p className={`text-xs font-medium truncate ${
-                                        session.id === activeSessionId
-                                            ? darkMode ? 'text-dark-text' : 'text-white'
-                                            : darkMode ? 'text-dark-muted group-hover:text-dark-text' : 'text-white/50 group-hover:text-white/80'
-                                    }`}>{session.title}</p>
-                                    <p className={`text-[9px] truncate mt-0.5 ${
-                                        darkMode ? 'text-dark-muted/60' : 'text-white/30'
-                                    }`}>{session.messages.length - 1} message{session.messages.length !== 2 ? 's' : ''}</p>
-                                </div>
-                                <button
-                                    onClick={(e) => deleteSession(e, session.id)}
-                                    className={`p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity ${
-                                        darkMode ? 'text-red-400 hover:bg-red-500/20' : 'text-red-500 hover:bg-red-100'
-                                    }`}
-                                >
-                                    <TrashIcon />
-                                </button>
-                                {session.id === activeSessionId && (
-                                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ml-1 ${
-                                        darkMode ? 'bg-brand-purple' : 'bg-white'
-                                    }`} />
+                                {!sidebarCollapsed && (
+                                    <>
+                                        <div className="flex-1 min-w-0">
+                                            <p className={`text-xs font-medium truncate ${
+                                                session.id === activeSessionId
+                                                    ? darkMode ? 'text-dark-text' : 'text-white'
+                                                    : darkMode ? 'text-dark-muted group-hover:text-dark-text' : 'text-white/50 group-hover:text-white/80'
+                                            }`}>{session.title}</p>
+                                            <p className={`text-[9px] truncate mt-0.5 ${
+                                                darkMode ? 'text-dark-muted/60' : 'text-white/30'
+                                            }`}>{session.messages.length - 1} message{session.messages.length !== 2 ? 's' : ''}</p>
+                                        </div>
+                                        <button
+                                            onClick={(e) => deleteSession(e, session.id)}
+                                            className={`p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity ${
+                                                darkMode ? 'text-red-400 hover:bg-red-500/20' : 'text-red-500 hover:bg-red-100'
+                                            }`}
+                                        >
+                                            <TrashIcon />
+                                        </button>
+                                        {session.id === activeSessionId && (
+                                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ml-1 ${
+                                                darkMode ? 'bg-brand-purple' : 'bg-white'
+                                            }`} />
+                                        )}
+                                    </>
                                 )}
                             </div>
                         ))}
@@ -418,72 +571,92 @@ export default function ChatApp() {
                 </div>
 
                 {/* Preferences Header */}
-                <p className={`text-[9px] font-bold tracking-[0.2em] uppercase px-4 mb-2 ${darkMode ? 'text-dark-muted' : 'text-white/40'}`}>
-                    Preferences Settings
-                </p>
+                {!sidebarCollapsed && (
+                    <p className={`text-[9px] font-bold tracking-[0.2em] uppercase px-4 mb-2 ${darkMode ? 'text-dark-muted' : 'text-white/40'}`}>
+                        Preferences Settings
+                    </p>
+                )}
 
                 {/* Controls */}
-                <div className="px-4 space-y-3 mb-4">
+                <div className={`px-4 space-y-3 mb-4 ${sidebarCollapsed ? 'flex flex-col items-center px-0' : ''}`}>
                     {/* Dark Mode Toggle */}
                     <button
                         onClick={() => setDarkMode(!darkMode)}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 cursor-pointer ${
-                            darkMode
-                                ? 'bg-white/5 text-dark-text hover:bg-white/10'
-                                : 'bg-white/10 text-white hover:bg-white/15'
+                        className={`flex items-center rounded-xl text-sm font-medium transition-all duration-300 cursor-pointer ${
+                            sidebarCollapsed 
+                                ? 'w-10 h-10 justify-center p-0 hover:bg-white/10 text-white'
+                                : 'w-full justify-between px-4 py-3 bg-white/10 text-white hover:bg-white/15'
+                        } ${
+                            !sidebarCollapsed && darkMode ? 'bg-white/5 text-dark-text hover:bg-white/10' : ''
                         }`}
+                        title={sidebarCollapsed ? "Toggle Theme" : undefined}
                     >
                         <span className="flex items-center gap-2">
                             {darkMode ? <MoonIcon /> : <SunIcon />}
-                            {darkMode ? 'Dark Mode' : 'Light Mode'}
+                            {!sidebarCollapsed && (darkMode ? 'Dark Mode' : 'Light Mode')}
                         </span>
-                        <div className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${darkMode ? 'bg-brand-purple' : 'bg-white/30'}`}>
-                            <motion.div
-                                animate={{ x: darkMode ? 20 : 0 }}
-                                transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                                className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-md"
-                            />
-                        </div>
+                        {!sidebarCollapsed && (
+                            <div className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${darkMode ? 'bg-brand-purple' : 'bg-white/30'}`}>
+                                <motion.div
+                                    animate={{ x: darkMode ? 20 : 0 }}
+                                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                    className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-md"
+                                />
+                            </div>
+                        )}
                     </button>
 
                     {/* Mock/Live Toggle */}
-                    <div className={`p-4 rounded-xl transition-colors duration-300 ${
-                        darkMode ? 'bg-white/5 border border-dark-border' : 'bg-white/10'
-                    }`}>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className={`text-xs font-bold tracking-wide ${darkMode ? 'text-dark-text' : 'text-white'}`}>
-                                    {useMock ? '🧪 Mock Mode' : '🔴 Live API'}
-                                </p>
-                                <p className={`text-[10px] mt-0.5 ${darkMode ? 'text-dark-muted' : 'text-white/40'}`}>
-                                    {useMock ? 'Using sample data' : 'Calling Gemini + MCP'}
-                                </p>
+                    <div className={`${
+                        sidebarCollapsed 
+                            ? 'w-10 h-10 flex items-center justify-center rounded-xl cursor-pointer hover:bg-white/10'
+                            : 'p-4 rounded-xl transition-colors duration-300 bg-white/10'
+                    } ${
+                        !sidebarCollapsed && darkMode ? 'bg-white/5 border border-dark-border' : ''
+                    }`}
+                    onClick={sidebarCollapsed ? () => setUseMock(!useMock) : undefined}
+                    title={sidebarCollapsed ? (useMock ? "Switch to Live API" : "Switch to Mock Mode") : undefined}
+                    >
+                        {sidebarCollapsed ? (
+                            <span className="text-base">{useMock ? '🧪' : '🔴'}</span>
+                        ) : (
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className={`text-xs font-bold tracking-wide ${darkMode ? 'text-dark-text' : 'text-white'}`}>
+                                        {useMock ? '🧪 Mock Mode' : '🔴 Live API'}
+                                    </p>
+                                    <p className={`text-[10px] mt-0.5 ${darkMode ? 'text-dark-muted' : 'text-white/40'}`}>
+                                        {useMock ? 'Using sample data' : 'Calling Gemini + MCP'}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setUseMock(!useMock)}
+                                    className={`relative w-12 h-6 rounded-full transition-colors duration-300 cursor-pointer ${
+                                        useMock ? 'bg-brand-purple' : 'bg-emerald-500'
+                                    }`}
+                                >
+                                    <motion.div
+                                        animate={{ x: useMock ? 0 : 24 }}
+                                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                        className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md"
+                                    />
+                                </button>
                             </div>
-                            <button
-                                onClick={() => setUseMock(!useMock)}
-                                className={`relative w-12 h-6 rounded-full transition-colors duration-300 cursor-pointer ${
-                                    useMock ? 'bg-brand-purple' : 'bg-emerald-500'
-                                }`}
-                            >
-                                <motion.div
-                                    animate={{ x: useMock ? 0 : 24 }}
-                                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                                    className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md"
-                                />
-                            </button>
-                        </div>
+                        )}
                     </div>
                 </div>
 
                 {/* Footer */}
-                <div className="px-4 pb-4">
-                    <div className={`p-3 rounded-xl text-[10px] ${
-                        darkMode ? 'bg-white/5 text-dark-muted border border-dark-border' : 'bg-white/5 text-white/40'
-                    }`}>
-                        <p className={`font-bold mb-0.5 ${darkMode ? 'text-dark-text' : 'text-white/70'}`}>Hackathon 2026</p>
-                        <p>Powered by Gemini · MCP · Kapruka</p>
+                {!sidebarCollapsed && (
+                    <div className="px-4 pb-4">
+                        <div className={`p-3 rounded-xl text-[10px] ${
+                            darkMode ? 'bg-white/5 text-dark-muted border border-dark-border' : 'bg-white/5 text-white/40'
+                        }`}>
+                            <p className={`font-bold mb-0.5 ${darkMode ? 'text-dark-text' : 'text-white/70'}`}>Hackathon 2026</p>
+                            <p>Powered by Gemini · MCP · Kapruka</p>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* ═══════════════ PANE 2: CHAT FEED ═══════════════ */}
@@ -497,6 +670,16 @@ export default function ChatApp() {
                 }`}>
                     {/* Left: active chat info */}
                     <div className="flex items-center gap-3">
+                        {sidebarCollapsed && (
+                            <button
+                                onClick={() => setSidebarCollapsed(false)}
+                                className={`p-1.5 rounded-lg transition-colors cursor-pointer mr-1 ${
+                                    darkMode ? 'text-dark-muted hover:bg-white/5 hover:text-dark-text' : 'text-gray-500 hover:bg-gray-100'
+                                }`}
+                            >
+                                <SidebarIcon />
+                            </button>
+                        )}
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-sm ${
                             darkMode ? 'bg-brand-purple/20 text-brand-purple' : 'bg-brand-purple/10 text-brand-purple'
                         }`}><ChatIcon /></div>
@@ -511,7 +694,9 @@ export default function ChatApp() {
                     </div>
                     {/* Right: actions */}
                     <div className="flex items-center gap-2">
-                        <button className={`relative flex items-center justify-center p-2 rounded-lg transition-all duration-200 ${
+                        <button 
+                            onClick={() => setShowCartPanel(!showCartPanel)}
+                            className={`relative flex items-center justify-center p-2 rounded-lg transition-all duration-200 cursor-pointer ${
                             darkMode
                                 ? 'bg-white/5 text-dark-muted hover:bg-white/10 hover:text-dark-text border border-dark-border'
                                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -552,7 +737,10 @@ export default function ChatApp() {
                 }`}>
                     <h1 className="text-lg font-bold text-white">Kapruka Concierge</h1>
                     <div className="flex items-center gap-2">
-                        <button className="relative text-white/80 p-2 flex items-center justify-center">
+                        <button 
+                            onClick={() => setShowCartPanel(!showCartPanel)}
+                            className="relative text-white/80 p-2 flex items-center justify-center cursor-pointer"
+                        >
                             <CartIcon />
                             {cart.length > 0 && (
                                 <span className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full shadow-sm">
@@ -677,69 +865,96 @@ export default function ChatApp() {
                     <AnimatePresence>
                         {messages.length === 1 ? (
                             <motion.div
-                                initial={{ opacity: 0, y: 25 }}
-                                animate={{ opacity: 1, y: 0 }}
+                                variants={{
+                                    hidden: { opacity: 0 },
+                                    show: {
+                                        opacity: 1,
+                                        transition: { staggerChildren: 0.15 }
+                                    }
+                                }}
+                                initial="hidden"
+                                animate="show"
                                 className="flex flex-col items-center justify-center max-w-2xl mx-auto my-auto py-6 text-center gap-6"
                             >
-                                {/* Glowing Icon */}
-                                <div className="w-16 h-16 bg-gradient-to-br from-brand-purple to-brand-purple-light rounded-2xl flex items-center justify-center text-3xl shadow-xl shadow-brand-purple/25 animate-float cursor-pointer hover:scale-105 transition-transform duration-300">
-                                    🎁
-                                </div>
+                                {/* Glowing Icon with pulse animation */}
+                                <motion.div 
+                                    variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}
+                                    animate={{ scale: [1, 1.05, 1], opacity: [0.9, 1, 0.9] }}
+                                    transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                                    className="w-16 h-16 bg-gradient-to-br from-brand-purple to-brand-purple-light rounded-2xl flex items-center justify-center text-white shadow-xl shadow-brand-purple/25 cursor-pointer"
+                                >
+                                    <BagIcon />
+                                </motion.div>
 
                                 {/* Big Title */}
-                                <div>
-                                    <h2 className="text-3xl md:text-5xl font-black tracking-tight leading-tight">
-                                        Colombo <span className="bg-gradient-to-r from-brand-purple via-brand-purple-light to-[#A17BD9] bg-clip-text text-transparent">Gift Concierge</span>
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}>
+                                    <h2 className="text-3xl md:text-5xl font-serif font-bold tracking-tight leading-tight">
+                                        Colombo <span className="italic font-bold bg-gradient-to-r from-brand-purple via-brand-purple-light to-[#A17BD9] bg-clip-text text-transparent">Shopping Concierge</span>
                                     </h2>
                                     <p className={`text-[9px] font-extrabold tracking-[0.25em] uppercase mt-2.5 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>
-                                        AI-Driven Luxury Gifting Platform
+                                        AI-Driven Luxury Gifting & Essentials Platform
                                     </p>
-                                </div>
+                                </motion.div>
 
                                 {/* Description */}
-                                <p className={`text-xs md:text-sm max-w-md leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>
-                                    Find, verify, and complete checkout for premium Kapruka gifts directly inside a conversation. Discover cakes, flowers, and toys with real-time delivery tracking.
-                                </p>
+                                <motion.p variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className={`text-xs md:text-sm max-w-lg leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>
+                                    Find, verify, and complete checkout for daily essentials, groceries, electronics, fashion, and premium gifts directly inside a conversation with real-time delivery tracking.
+                                </motion.p>
 
                                 {/* How It Works Grid */}
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 w-full text-left mt-2">
-                                    <div className={`p-5 rounded-2xl border transition-all duration-300 ${
-                                        darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple/40' : 'bg-white border-gray-100 shadow-md hover:shadow-xl'
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 w-full text-left mt-2">
+                                    {/* Feature Card 1 */}
+                                    <div 
+                                        onClick={() => sendMessage("Show me trending birthday gifts")}
+                                        className={`p-5 rounded-2xl border transition-all duration-300 cursor-pointer relative overflow-hidden group ${
+                                        darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple/50 hover:bg-brand-purple/5' : 'bg-white border-gray-100 shadow-md hover:shadow-2xl hover:-translate-y-1 hover:border-brand-purple/30'
                                     }`}>
-                                        <span className="text-xl mb-2.5 block">🔍</span>
-                                        <h4 className={`font-bold text-xs uppercase tracking-wide mb-1.5 ${darkMode ? 'text-dark-text' : 'text-brand-purple'}`}>Search Catalog</h4>
-                                        <p className={`text-[10px] leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
-                                            Instantly search cakes, flowers, and soft toys in real-time with filters.
+                                        <div className="absolute inset-0 bg-gradient-to-br from-brand-purple/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                        <span className={`mb-2.5 block relative z-10 ${darkMode ? 'text-brand-purple' : 'text-[#002F6C]'}`}><SearchIcon /></span>
+                                        <h4 className={`font-bold text-xs uppercase tracking-wide mb-1.5 relative z-10 ${darkMode ? 'text-dark-text' : 'text-brand-purple'}`}>Explore Catalog</h4>
+                                        <p className={`text-[10px] leading-relaxed relative z-10 ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
+                                            Instantly search groceries, electronics, cakes, flowers, and essentials in real-time.
                                         </p>
                                     </div>
-                                    <div className={`p-5 rounded-2xl border transition-all duration-300 ${
-                                        darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple/40' : 'bg-white border-gray-100 shadow-md hover:shadow-xl'
+                                    
+                                    {/* Feature Card 2 */}
+                                    <div 
+                                        onClick={() => sendMessage("Check logistics for a delivery to Kandy")}
+                                        className={`p-5 rounded-2xl border transition-all duration-300 cursor-pointer relative overflow-hidden group ${
+                                        darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple/50 hover:bg-brand-purple/5' : 'bg-white border-gray-100 shadow-md hover:shadow-2xl hover:-translate-y-1 hover:border-brand-purple/30'
                                     }`}>
-                                        <span className="text-xl mb-2.5 block">🚚</span>
-                                        <h4 className={`font-bold text-xs uppercase tracking-wide mb-1.5 ${darkMode ? 'text-dark-text' : 'text-brand-purple'}`}>Check Delivery</h4>
-                                        <p className={`text-[10px] leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
-                                            Confirm flat shipping rates, arrival dates, and city compatibility checks.
+                                        <div className="absolute inset-0 bg-gradient-to-br from-brand-purple/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                        <span className={`mb-2.5 block relative z-10 ${darkMode ? 'text-brand-purple' : 'text-[#002F6C]'}`}><TruckIcon /></span>
+                                        <h4 className={`font-bold text-xs uppercase tracking-wide mb-1.5 relative z-10 ${darkMode ? 'text-dark-text' : 'text-brand-purple'}`}>Check Logistics</h4>
+                                        <p className={`text-[10px] leading-relaxed relative z-10 ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
+                                            Verify flat shipping rates, arrival timelines, and city compatibility checks instantly.
                                         </p>
                                     </div>
-                                    <div className={`p-5 rounded-2xl border transition-all duration-300 ${
-                                        darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple/40' : 'bg-white border-gray-100 shadow-md hover:shadow-xl'
+                                    
+                                    {/* Feature Card 3 */}
+                                    <div 
+                                        onClick={() => sendMessage("How do I complete checkout in-app?")}
+                                        className={`p-5 rounded-2xl border transition-all duration-300 cursor-pointer relative overflow-hidden group ${
+                                        darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple/50 hover:bg-brand-purple/5' : 'bg-white border-gray-100 shadow-md hover:shadow-2xl hover:-translate-y-1 hover:border-brand-purple/30'
                                     }`}>
-                                        <span className="text-xl mb-2.5 block">💳</span>
-                                        <h4 className={`font-bold text-xs uppercase tracking-wide mb-1.5 ${darkMode ? 'text-dark-text' : 'text-brand-purple'}`}>In-App Checkout</h4>
-                                        <p className={`text-[10px] leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
-                                            Pay securely within the chat interface and track status stages.
+                                        <div className="absolute inset-0 bg-gradient-to-br from-brand-purple/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                        <span className={`mb-2.5 block relative z-10 ${darkMode ? 'text-brand-purple' : 'text-[#002F6C]'}`}><CardIcon /></span>
+                                        <h4 className={`font-bold text-xs uppercase tracking-wide mb-1.5 relative z-10 ${darkMode ? 'text-dark-text' : 'text-brand-purple'}`}>In-App Checkout</h4>
+                                        <p className={`text-[10px] leading-relaxed relative z-10 ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
+                                            Manage your cart, submit recipient info, and complete secure payments inside the chat.
                                         </p>
                                     </div>
-                                </div>
+                                </motion.div>
 
                                 {/* Greeting Bot Bubble */}
-                                <div className={`p-5 text-left rounded-3xl rounded-bl-lg max-w-full mt-2 border ${
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className={`p-5 text-left rounded-3xl rounded-bl-lg max-w-full mt-2 border relative overflow-hidden group ${
                                     darkMode ? 'bg-dark-card/40 border-dark-border/40 text-dark-text' : 'bg-white border-gray-100/80 shadow-md text-gray-700'
                                 }`}>
-                                    <p className="text-xs leading-relaxed">
-                                        Ayubowan! ✨ I'm your Colombo Gift Concierge. Tell me who you're shopping for, or select a quick option below to get started!
+                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-brand-purple/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                    <p className="text-xs leading-relaxed relative z-10">
+                                        {getDynamicGreeting()} Tell me what you're looking for (e.g. daily essentials, gifts, or cakes), or select a quick option below to get started!
                                     </p>
-                                </div>
+                                </motion.div>
                             </motion.div>
                         ) : (
                             messages.map((msg, index) => (
@@ -772,7 +987,9 @@ export default function ChatApp() {
                                     {/* ── 1. Search Results Grid ── */}
                                     {msg.tool === 'kapruka_search_products' && msg.raw_data && (() => {
                                         const searchData = getParsedData(msg.raw_data);
-                                        if (!searchData || !Array.isArray(searchData.results)) {
+                                        const resultsArray = Array.isArray(searchData) ? searchData : (searchData?.results || []);
+                                        
+                                        if (!resultsArray || resultsArray.length === 0) {
                                             const mdText = msg.raw_data?.result || msg.raw_data?.structuredContent?.result;
                                             return mdText ? (
                                                 <div className={`mt-4 p-4 rounded-2xl border prose prose-sm max-w-none text-sm ${
@@ -785,7 +1002,7 @@ export default function ChatApp() {
 
                                         return (
                                             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                {searchData.results.map((product: any) => (
+                                                {resultsArray.map((product: any) => (
                                                     <motion.div
                                                         key={product.id}
                                                         initial={{ opacity: 0, y: 12 }}
@@ -802,15 +1019,17 @@ export default function ChatApp() {
                                                         <div className={`relative h-44 overflow-hidden flex items-center justify-center ${
                                                             darkMode ? 'bg-dark-bg' : 'bg-gradient-to-br from-gray-50 to-gray-100'
                                                         }`}>
-                                                            {product.image_url ? (
-                                                                <img
-                                                                    src={product.image_url}
-                                                                    alt={product.name}
-                                                                    className="max-h-full max-w-full object-contain transition-transform duration-500 hover:scale-110"
-                                                                />
-                                                            ) : (
-                                                                <div className="text-4xl opacity-30">🎁</div>
-                                                            )}
+                                                            <ImageWithFallback 
+                                                                src={product.image_url} 
+                                                                alt={product.name}
+                                                                className="max-h-full max-w-full object-contain transition-transform duration-500 hover:scale-110"
+                                                                fallback={
+                                                                    <div className={`flex flex-col items-center justify-center w-full h-full opacity-60 ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>
+                                                                        <FallbackImageIcon className="w-10 h-10 mb-2 opacity-50" />
+                                                                        <span className="text-[10px] font-bold uppercase tracking-widest">No Image</span>
+                                                                    </div>
+                                                                }
+                                                            />
                                                             {/* Gradient overlay at bottom */}
                                                             <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/20 to-transparent" />
                                                             {/* Stock badge */}
@@ -1254,11 +1473,11 @@ export default function ChatApp() {
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            placeholder="Tell me about a gift you're looking for..."
-                            className={`flex-1 p-4 rounded-2xl focus-glow transition-all duration-300 text-sm ${
+                            placeholder={placeholderText || " "}
+                            className={`flex-1 p-4 rounded-2xl focus-glow transition-all duration-300 text-sm placeholder:italic placeholder:tracking-wide ${
                                 darkMode
-                                    ? 'glass-input text-dark-text placeholder:text-dark-muted border border-dark-border focus:border-brand-purple/50'
-                                    : 'glass-input text-gray-700 placeholder:text-gray-400 border border-[#002F6C]/10 focus:border-brand-purple'
+                                    ? 'glass-input text-dark-text placeholder:text-dark-muted/80 border border-dark-border focus:border-brand-purple/50'
+                                    : 'glass-input text-gray-700 placeholder:text-gray-400/90 border border-[#002F6C]/10 focus:border-brand-purple'
                             }`}
                             disabled={isLoading}
                         />
@@ -1312,11 +1531,18 @@ export default function ChatApp() {
                             }`}>
                                 {(() => {
                                     const imgUrl = activeProduct.image_url || activeProduct.images?.[0];
-                                    return imgUrl ? (
-                                        <img src={imgUrl} alt={activeProduct.name}
-                                            className="w-full h-64 object-contain rounded-xl group-hover:scale-105 transition-transform duration-500" />
-                                    ) : (
-                                        <div className={`w-full h-64 flex items-center justify-center ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>No Image Available</div>
+                                    return (
+                                        <ImageWithFallback 
+                                            src={imgUrl} 
+                                            alt={activeProduct.name}
+                                            className="w-full h-64 object-contain rounded-xl group-hover:scale-105 transition-transform duration-500"
+                                            fallback={
+                                                <div className={`w-full h-64 flex flex-col items-center justify-center rounded-xl bg-gradient-to-br ${darkMode ? 'from-dark-bg to-black/20 text-dark-muted' : 'from-gray-100 to-gray-50 text-gray-400'}`}>
+                                                    <FallbackImageIcon className="w-16 h-16 mb-3 opacity-30" />
+                                                    <span className="text-xs font-bold uppercase tracking-widest opacity-60">Image Unavailable</span>
+                                                </div>
+                                            }
+                                        />
                                     );
                                 })()}
                             </div>
@@ -1845,6 +2071,114 @@ export default function ChatApp() {
                                 </div>
                             )}
                         </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* ═══════════════ PANE 5: SHOPPING CART PANEL ═══════════════ */}
+            <AnimatePresence>
+                {showCartPanel && (
+                    <motion.div
+                        initial={{ x: 400, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        exit={{ x: 400, opacity: 0 }}
+                        transition={{ type: "spring", stiffness: 280, damping: 28 }}
+                        className={`w-80 lg:w-[400px] flex flex-col z-30 h-full transition-colors duration-300 relative ${
+                            darkMode
+                                ? 'bg-dark-surface/95 backdrop-blur-xl border-l border-dark-border'
+                                : 'bg-white/95 backdrop-blur-xl border-l border-[#002F6C]/10 shadow-2xl'
+                        }`}
+                    >
+                        {/* Header */}
+                        <div className={`p-4 flex justify-between items-center border-b transition-colors duration-300 ${
+                            darkMode ? 'border-dark-border' : 'border-gray-100 bg-[#FDF2F4]/30'
+                        }`}>
+                            <div className="flex items-center gap-2">
+                                <span className={`text-base flex items-center justify-center ${darkMode ? 'text-brand-purple' : 'text-[#002F6C]'}`}><CartIcon /></span>
+                                <h3 className={`font-bold text-sm ${darkMode ? 'text-dark-text' : 'text-gray-900'}`}>Shopping Cart</h3>
+                            </div>
+                            <button onClick={() => setShowCartPanel(false)} className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                darkMode ? 'text-dark-muted hover:bg-white/5 hover:text-dark-text' : 'text-gray-500 hover:bg-gray-100'
+                            }`}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
+                        </div>
+                        {/* Cart Items */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                            {cart.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center text-center py-20 gap-4 h-full">
+                                    <span className={`text-5xl ${darkMode ? 'text-dark-muted/30' : 'text-gray-200'}`}><CartIcon /></span>
+                                    <div>
+                                        <h4 className={`font-bold text-sm ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>Your Cart is Empty</h4>
+                                        <p className={`text-xs mt-1 max-w-[200px] mx-auto ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
+                                            Explore the catalog and add products to start shopping.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {cart.map(item => (
+                                        <div key={item.id} className={`p-3 rounded-2xl border transition-all duration-200 flex gap-3 items-center ${
+                                            darkMode ? 'bg-dark-card border-dark-border' : 'bg-white border-gray-100 shadow-sm'
+                                        }`}>
+                                            <ImageWithFallback 
+                                                src={item.image_url || item.images?.[0]} 
+                                                className="w-12 h-12 rounded-xl object-cover shadow-sm"
+                                                fallback={
+                                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-dark-bg text-dark-muted' : 'bg-gray-100 text-gray-400'}`}>
+                                                        <FallbackImageIcon className="w-6 h-6 opacity-50" />
+                                                    </div>
+                                                }
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <p className={`text-xs font-semibold truncate ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>{item.name}</p>
+                                                <p className="text-[10px] text-brand-purple mt-0.5 font-bold">{item.price.currency || 'LKR'} {item.price.amount.toLocaleString()}</p>
+                                                <div className="flex items-center gap-2 mt-1.5">
+                                                    <button onClick={() => decreaseQty(item.id)} className={`w-5 h-5 flex items-center justify-center rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
+                                                        darkMode ? 'border-dark-border text-dark-text hover:bg-white/5' : 'border-gray-200 text-gray-700 hover:bg-gray-100'
+                                                    }`}>-</button>
+                                                    <span className={`text-xs font-bold ${darkMode ? 'text-dark-text' : 'text-gray-900'}`}>{item.qty}</span>
+                                                    <button onClick={() => increaseQty(item.id)} className={`w-5 h-5 flex items-center justify-center rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
+                                                        darkMode ? 'border-dark-border text-dark-text hover:bg-white/5' : 'border-gray-200 text-gray-700 hover:bg-gray-100'
+                                                    }`}>+</button>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => removeFromCart(item.id)} className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                                darkMode ? 'text-red-400 hover:bg-red-500/20' : 'text-red-500 hover:bg-red-50'
+                                            }`}>
+                                                <TrashIcon />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        {/* Summary & Checkout */}
+                        {cart.length > 0 && (
+                            <div className={`p-4 border-t transition-colors duration-300 space-y-4 ${
+                                darkMode ? 'border-dark-border bg-dark-card/20' : 'border-gray-100 bg-[#FDF2F4]/10'
+                            }`}>
+                                <div className="space-y-1.5">
+                                    <div className={`flex justify-between text-xs font-bold ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>
+                                        <span>Total Items</span>
+                                        <span>{cart.reduce((sum, item) => sum + item.qty, 0)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm font-extrabold text-brand-purple">
+                                        <span>Subtotal</span>
+                                        <span>LKR {cart.reduce((sum, item) => sum + (item.price.amount * item.qty), 0).toLocaleString()}</span>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setShowCartPanel(false);
+                                        sendMessage(`I want to checkout my cart containing: ${cart.map(i => `${i.name} (x${i.qty})`).join(', ')}`);
+                                    }}
+                                    className="w-full py-3 bg-gradient-to-r from-brand-purple to-brand-purple-dark text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all duration-300 text-center cursor-pointer uppercase tracking-wider"
+                                >
+                                    Proceed to Checkout
+                                </button>
+                            </div>
+                        )}
                     </motion.div>
                 )}
             </AnimatePresence>

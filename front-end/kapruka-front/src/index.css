@@ -130,3 +130,15 @@ body {
 .dark .prose a {
   color: #A17BD9;
 }
+
+/* ─── Animated Gradient Mesh Background ─── */
+@keyframes animatedMesh {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-mesh {
+  background-size: 200% 200%;
+  animation: animatedMesh 15s ease infinite;
+}
