@@ -7,7 +7,7 @@ import { ImageWithFallback } from './components/common/ImageWithFallback';
 import {
   SendIcon, SunIcon, MoonIcon, EditIcon, ChatIcon, HelpIcon, HistoryIcon, CategoriesIcon,
   CartIcon, TrashIcon, SidebarIcon, FallbackImageIcon,
-  AttachmentIcon, MicrophoneIcon
+  AttachmentIcon, MicrophoneIcon, EyeIcon
 } from './components/icons';
 
 interface RawData {
@@ -35,12 +35,73 @@ interface ChatSession {
   createdAt: number;
 }
 
+const translations = {
+    en: {
+        heroTitle: "Your Personal AI Shopping Concierge",
+        heroSub: "ආයුබෝවන් • வணக்கம் • Welcome",
+        heroDesc: "Find gifts, flowers, cakes, electronics, and essentials with AI-powered assistance and island-wide delivery.",
+        welcomeTitle: "ආයුබෝවන් 👋 | வணக்கம் 👋",
+        welcomeSub: "I'm your personal shopping concierge.",
+        welcomeTellMe: "Tell me:",
+        welcomeOccasion: "What occasion is it?",
+        welcomeBudget: "What's your budget?",
+        welcomeDelivery: "Where should it be delivered?",
+        welcomeFooter: "I'll find the perfect gift instantly.",
+        trustIndicator: "English • සිංහල • தமிழ் Support Available",
+        trustIndicatorSub: "Customers can chat naturally in English, Sinhala, or Tamil.",
+        servingCities: "Serving customers across Sri Lanka",
+        sameDayBanner: "Same-Day Delivery Available in Selected Areas",
+        tryPrompts: "Try these prompts",
+        shopOccasion: "Shop By Occasion",
+        inputPlaceholder: "What gift are you looking for today?",
+    },
+    si: {
+        heroTitle: "ඔබේ පෞද්ගලික AI සාප්පු සවාරි සහායකයා",
+        heroSub: "ආයුබෝවන් • வணக்கம் • Welcome",
+        heroDesc: "මල්, කේක්, තෑගි, ඉලෙක්ට්‍රොනික උපකරණ සහ අනෙකුත් දෑ AI සහාය ඇතිව දිවයින පුරා බෙදාහැරීමේ සේවාව සමගින් සොයාගන්න.",
+        welcomeTitle: "ආයුබෝවන් 👋 | வணக்கம் 👋",
+        welcomeSub: "මම ඔබේ පෞද්ගලික සාප්පු සවාරි සහායකයා.",
+        welcomeTellMe: "මට පවසන්න:",
+        welcomeOccasion: "උත්සවය කුමක්ද?",
+        welcomeBudget: "ඔබේ අයවැය කොපමණද?",
+        welcomeDelivery: "එය භාර දිය යුත්තේ කොහේද?",
+        welcomeFooter: "මම ඔබට කදිම තෑග්ගක් සැනෙකින් සොයා දෙන්නෙමි.",
+        trustIndicator: "English • සිංහල • தமிழ் සහාය ඇත",
+        trustIndicatorSub: "පාරිභෝගිකයින්ට ඉංග්‍රීසි, සිංහල හෝ දෙමළ භාෂාවෙන් සුමටව සංවාදයේ යෙදිය හැකිය.",
+        servingCities: "ශ්‍රී ලංකාව පුරා සිටින පාරිභෝගිකයින්ට සේවා සපයනු ලැබේ",
+        sameDayBanner: "තෝරාගත් ප්‍රදේශ කිහිපයක එදිනම බෙදා හැරීම සිදු කළ හැකිය",
+        tryPrompts: "මෙම විමසුම් උත්සාහ කරන්න",
+        shopOccasion: "විශේෂ උත්සව අනුව තෝරන්න",
+        inputPlaceholder: "අද ඔබ සොයන්නේ කුමන ආකාරයේ තෑග්ගක්ද?",
+    },
+    ta: {
+        heroTitle: "உங்கள் தனிப்பட்ட AI ஷாப்பிங் உதவியாளர்",
+        heroSub: "வணக்கம் • Welcome • ஆயுபோவன்",
+        heroDesc: "பூக்கள், கேக்குகள், பரிசுகள், மின்னணு பொருட்கள் மற்றும் பிறவற்றை AI உதவியுடன் நாடு தழுவிய விநியோகத்துடன் கண்டறியுங்கள்.",
+        welcomeTitle: "ආයුබෝවන් 👋 | வணக்கம் 👋",
+        welcomeSub: "நான் உங்கள் தனிப்பட்ட ஷாப்பிங் உதவியாளர்.",
+        welcomeTellMe: "எனக்குச் சொல்லுங்கள்:",
+        welcomeOccasion: "என்ன சந்தர்ப்பம்?",
+        welcomeBudget: "உங்கள் வரவுசெலவுத் திட்டம் என்ன?",
+        welcomeDelivery: "எங்கு விநியோகிக்கப்பட வேண்டும்?",
+        welcomeFooter: "நான் சிறந்த பரிசை உடனடியாகக் கண்டுபிடிப்பேன்.",
+        trustIndicator: "English • සිංහල • தமிழ் ஆதரவு கிடைக்கிறது",
+        trustIndicatorSub: "வாடிக்கையாளர்கள் ஆங்கிலம், சிங்களம் அல்லது தமிழில் இயல்பாக அரட்டையடிக்கலாம்.",
+        servingCities: "இலங்கை முழுவதும் உள்ள வாடிக்கையாளர்களுக்கு சேவை வழங்கப்படுகிறது",
+        sameDayBanner: "தேர்ந்தெடுக்கப்பட்ட பகுதிகளில் ஒரே நாளில் டெலிவரி கிடைக்கும்",
+        tryPrompts: "இந்த தூண்டல்களை முயற்சிக்கவும்",
+        shopOccasion: "சந்தர்ப்பம் மூலம் ஷாப்பிங் செய்யுங்கள்",
+        inputPlaceholder: "இன்று நீங்கள் எந்த பரிசைத் தேடுகிறீர்கள்?",
+    }
+};
+
 const getInitialWelcomeMsg = (): Message => ({ 
     role: 'bot', 
     text: `${getDynamicGreeting()} I'm your Colombo Gift Concierge — powered by AI. Tell me who you're shopping for, and I'll find the perfect gift!` 
 });
 
 export default function ChatApp() {
+    const [currentLang, setCurrentLang] = useState<'en' | 'si' | 'ta'>('en');
     // ── Chat sessions ──
     const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => {
         const initial: ChatSession = { id: Date.now().toString(), title: 'Chat 1', messages: [getInitialWelcomeMsg()], createdAt: Date.now() };
@@ -240,24 +301,28 @@ export default function ChatApp() {
 
     const faqs = [
         {
-            q: "How do I find a product?",
-            a: "You can search by typing queries like 'Show me chocolate cakes', 'Look for teddy bears', or 'Do you have red roses?'. The AI will search Kapruka's catalog and display a rich interactive grid."
+            q: "What delivery options does Kapruka offer?",
+            a: "We offer island-wide delivery in Sri Lanka. You can schedule delivery for specific dates, including same-day delivery for select items in the Colombo area. Simply ask the AI to 'Check delivery options' for your desired town."
         },
         {
-            q: "Can I check if delivery is available to my town?",
-            a: "Yes! You can ask 'Check delivery to Colombo 04' or click the 'Calculate Shipping' button on any product inspect panel. The concierge will check the flat rate and delivery date."
+            q: "What languages can I use to chat with the concierge?",
+            a: "Our AI Concierge is fluent in English, Sinhala, and Tamil. You can switch languages at the top of the screen or simply start typing in your preferred language."
         },
         {
-            q: "How do I place an order?",
-            a: "Just tell the AI 'I want to buy SOFTTOY001218' or click the 'Buy' button. The concierge will ask for the required delivery fields (Recipient Name, Address, Sender Name, Date) and generate a secure checkout card."
+            q: "How do I make a payment securely?",
+            a: "We accept Visa, MasterCard, American Express, and popular local mobile wallets. Once you confirm your order details, the AI will provide a secure payment link that you can complete within the app or in a new tab."
         },
         {
-            q: "What payment methods are supported?",
-            a: "Kapruka checkout supports Visa, MasterCard, AMEX, and local mobile wallets. You can pay directly via our secure in-app checkout panel or open the payment link in a new tab."
+            q: "Can I customize cakes or flower arrangements?",
+            a: "Yes, many of our cakes and floral arrangements allow customization, such as adding an icing message. Let the AI know your requirements (e.g., 'Add a Happy Birthday message')."
         },
         {
-            q: "How can I track my order status?",
-            a: "Go to your 'Order History' in the sidebar and click 'Track Order', or ask the AI directly: 'Track order KAPRUKA-12345'."
+            q: "How do I track an existing order?",
+            a: "You can track your order status in real-time by asking the concierge 'Track order [Your Order Number]' or by clicking the tracking link in your order confirmation email."
+        },
+        {
+            q: "What is your return and refund policy?",
+            a: "We offer a flexible refund policy for damaged or incorrect items. Please contact our support team or inform the concierge within 24 hours of delivery with photos of the item."
         }
     ];
 
@@ -600,6 +665,34 @@ export default function ChatApp() {
                     </div>
                     {/* Right: actions */}
                     <div className="flex items-center gap-2">
+                        {/* Language Selector */}
+                        <div className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold mr-1.5 border ${
+                            darkMode ? 'border-dark-border bg-white/5' : 'border-gray-200 bg-gray-50'
+                        }`}>
+                            <span className="text-sm mr-0.5">🌐</span>
+                            {(['en', 'si', 'ta'] as const).map((lang) => {
+                                const labels = { en: 'English', si: 'සිංහල', ta: 'தமிழ்' };
+                                const isActive = currentLang === lang;
+                                return (
+                                    <button
+                                        key={lang}
+                                        onClick={() => setCurrentLang(lang)}
+                                        className={`px-1.5 py-0.5 rounded transition-all duration-200 cursor-pointer ${
+                                            isActive
+                                                ? darkMode 
+                                                    ? 'bg-brand-purple/20 text-brand-purple-accent font-bold' 
+                                                    : 'bg-brand-purple/10 text-brand-purple font-bold'
+                                                : darkMode
+                                                    ? 'text-dark-muted hover:text-dark-text'
+                                                    : 'text-gray-500 hover:text-gray-950'
+                                        }`}
+                                    >
+                                        {labels[lang]}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
                         <button 
                             onClick={() => setShowCartPanel(!showCartPanel)}
                             className={`relative flex items-center justify-center p-2 rounded-lg transition-all duration-200 cursor-pointer ${
@@ -628,25 +721,48 @@ export default function ChatApp() {
                 </div>
 
                 {/* Mobile Header */}
-                <div className={`md:hidden p-4 shadow-md z-10 flex justify-between items-center transition-colors duration-300 ${
+                <div className={`md:hidden p-4 shadow-md z-10 flex flex-col gap-2 transition-colors duration-300 ${
                     darkMode ? 'bg-dark-surface border-b border-dark-border' : 'bg-[#002F6C]'
                 }`}>
-                    <h1 className="text-lg font-bold text-white">Kapruka Concierge</h1>
-                    <div className="flex items-center gap-2">
-                        <button 
-                            onClick={() => setShowCartPanel(!showCartPanel)}
-                            className="relative text-white/80 p-2 flex items-center justify-center cursor-pointer"
-                        >
-                            <CartIcon />
-                            {cart.length > 0 && (
-                                <span className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full shadow-sm">
-                                    {cart.reduce((total, item) => total + item.qty, 0)}
-                                </span>
-                            )}
-                        </button>
-                        <button onClick={() => setDarkMode(!darkMode)} className={`p-2 flex items-center justify-center rounded-lg transition-colors ${darkMode ? 'text-brand-purple-accent hover:bg-brand-purple/20' : 'text-white/80 hover:bg-white/20'}`}>
-                            {darkMode ? <SunIcon /> : <MoonIcon />}
-                        </button>
+                    <div className="flex justify-between items-center w-full">
+                        <h1 className="text-lg font-bold text-white">Kapruka Concierge</h1>
+                        <div className="flex items-center gap-2">
+                            <button 
+                                onClick={() => setShowCartPanel(!showCartPanel)}
+                                className="relative text-white/80 p-2 flex items-center justify-center cursor-pointer"
+                            >
+                                <CartIcon />
+                                {cart.length > 0 && (
+                                    <span className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full shadow-sm">
+                                        {cart.reduce((total, item) => total + item.qty, 0)}
+                                    </span>
+                                )}
+                            </button>
+                            <button onClick={() => setDarkMode(!darkMode)} className={`p-2 flex items-center justify-center rounded-lg transition-colors ${darkMode ? 'text-brand-purple-accent hover:bg-brand-purple/20' : 'text-white/80 hover:bg-white/20'}`}>
+                                {darkMode ? <SunIcon /> : <MoonIcon />}
+                            </button>
+                        </div>
+                    </div>
+                    {/* Mobile Language Selector */}
+                    <div className="flex items-center gap-1.5 justify-center py-1 border-t border-white/10 dark:border-dark-border/40 text-[11px]">
+                        <span className="text-white/60 dark:text-dark-muted font-medium">🌐 Language:</span>
+                        {(['en', 'si', 'ta'] as const).map((lang) => {
+                            const labels = { en: 'English', si: 'සිංහල', ta: 'தமிழ்' };
+                            const isActive = currentLang === lang;
+                            return (
+                                <button
+                                    key={lang}
+                                    onClick={() => setCurrentLang(lang)}
+                                    className={`px-2 py-0.5 rounded transition-all duration-200 cursor-pointer ${
+                                        isActive
+                                            ? 'bg-white/20 text-white font-bold'
+                                            : 'text-white/60 hover:text-white dark:text-dark-muted dark:hover:text-dark-text'
+                                    }`}
+                                >
+                                    {labels[lang]}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -721,38 +837,45 @@ export default function ChatApp() {
                         </div>
 
                         {/* FAQ Accordion */}
-                        <div className="max-w-3xl w-full mx-auto space-y-3 pb-6">
-                            <p className={`text-xs font-bold uppercase tracking-widest mb-3 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>Frequently Asked Questions</p>
-                            {faqs.map((faq, idx) => {
-                                const isExpanded = expandedFaq === idx;
-                                return (
-                                    <div
-                                        key={idx}
-                                        className={`rounded-2xl border overflow-hidden transition-all duration-300 ${
-                                            isExpanded
-                                                ? darkMode ? 'bg-brand-purple/10 border-brand-purple-accent/30' : 'bg-brand-purple/5 border-brand-purple/20'
-                                                : darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple-accent/20' : 'bg-white border-gray-100 hover:border-brand-purple/15 shadow-sm'
-                                        }`}
-                                    >
-                                        <button
-                                            onClick={() => setExpandedFaq(isExpanded ? null : idx)}
-                                            className="w-full flex justify-between items-center px-5 py-4 text-left cursor-pointer"
+                        <div className="max-w-4xl w-full mx-auto space-y-4 pb-10">
+                            <div className="text-center mb-8">
+                                <h3 className={`text-2xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Frequently Asked Questions</h3>
+                                <p className={`text-sm ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Everything you need to know about shopping with our AI Concierge.</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {faqs.map((faq, idx) => {
+                                    const isExpanded = expandedFaq === idx;
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className={`rounded-2xl border overflow-hidden transition-all duration-300 ${
+                                                isExpanded
+                                                    ? darkMode ? 'bg-brand-purple/10 border-brand-purple-accent/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]' : 'bg-brand-purple/5 border-brand-purple/30 shadow-md'
+                                                    : darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple-accent/30' : 'bg-white border-gray-100 hover:border-brand-purple/20 hover:shadow-md'
+                                            }`}
                                         >
-                                            <span className={`text-sm font-semibold ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>{faq.q}</span>
-                                            <span className={`text-lg transition-transform duration-300 ml-3 flex-shrink-0 ${isExpanded ? 'rotate-180' : ''} ${darkMode ? 'text-brand-purple-accent' : 'text-brand-purple'}`}>
-                                                ⌄
-                                            </span>
-                                        </button>
-                                        {isExpanded && (
-                                            <div className={`px-5 pb-5 text-sm leading-relaxed ${
-                                                darkMode ? 'text-dark-muted' : 'text-gray-600'
-                                            }`}>
-                                                {faq.a}
+                                            <button
+                                                onClick={() => setExpandedFaq(isExpanded ? null : idx)}
+                                                className="w-full flex justify-between items-start px-6 py-5 text-left cursor-pointer group"
+                                            >
+                                                <span className={`text-[15px] font-semibold pr-4 leading-snug group-hover:text-brand-purple transition-colors ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>{faq.q}</span>
+                                                <span className={`text-2xl font-light transition-transform duration-300 flex-shrink-0 mt-[-4px] ${isExpanded ? 'rotate-45 text-brand-purple-accent' : 'text-gray-400 group-hover:text-brand-purple'} ${darkMode && !isExpanded ? 'text-dark-muted' : ''}`}>
+                                                    +
+                                                </span>
+                                            </button>
+                                            <div 
+                                                className={`transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-40 opacity-100 mb-4' : 'max-h-0 opacity-0'} overflow-hidden`}
+                                            >
+                                                <div className={`px-6 text-[14px] leading-relaxed border-t mt-1 pt-4 ${
+                                                    darkMode ? 'text-dark-muted border-dark-border' : 'text-gray-600 border-gray-100'
+                                                }`}>
+                                                    {faq.a}
+                                                </div>
                                             </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 ) : (
@@ -773,17 +896,35 @@ export default function ChatApp() {
                                 exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
                                 className="flex flex-col items-center max-w-5xl mx-auto py-6 text-center gap-10"
                             >
-                                {/* Hero Section */}
+                                 {/* Hero Section */}
                                 <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="flex flex-col items-center gap-4">
-                                    <h2 className="text-4xl md:text-6xl font-serif font-bold tracking-tight leading-tight">
-                                        Your Personal <span className="italic font-bold bg-gradient-to-r from-brand-purple via-brand-purple-light to-[#A17BD9] bg-clip-text text-transparent">AI Shopping Concierge</span>
+                                    <p className="text-brand-purple dark:text-brand-purple-accent text-xs font-bold uppercase tracking-[0.25em] bg-brand-purple/10 px-4 py-1.5 rounded-full border border-brand-purple/20">
+                                        {translations[currentLang].heroSub}
+                                    </p>
+                                    <h2 className="text-4xl md:text-6xl font-serif font-bold tracking-tight leading-tight max-w-3xl">
+                                        {translations[currentLang].heroTitle}
                                     </h2>
                                     <p className={`text-sm md:text-base max-w-2xl leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>
-                                        Find gifts, compare options, arrange delivery, and checkout in minutes — all through a simple conversation.
+                                        {translations[currentLang].heroDesc}
                                     </p>
+
+                                    {/* Language Support Indicator Trust Badge */}
+                                    <div className={`mt-2 flex flex-col items-center gap-1.5 px-6 py-3 rounded-2xl border ${
+                                        darkMode ? 'bg-dark-card/30 border-dark-border/60' : 'bg-brand-purple/5 border-brand-purple/10'
+                                    }`}>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm">🇱🇰</span>
+                                            <span className={`text-xs font-bold tracking-wider ${darkMode ? 'text-brand-purple-accent' : 'text-brand-purple'}`}>
+                                                {translations[currentLang].trustIndicator}
+                                            </span>
+                                        </div>
+                                        <span className={`text-[10px] text-center ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
+                                            {translations[currentLang].trustIndicatorSub}
+                                        </span>
+                                    </div>
                                     
                                     {/* Trust Indicators */}
-                                    <div className="flex flex-wrap justify-center gap-4 md:gap-8 mt-4">
+                                    <div className="flex flex-wrap justify-center gap-4 md:gap-8 mt-2">
                                         <div className="flex items-center gap-2">
                                             <span className="text-yellow-400 text-lg">⭐⭐⭐⭐⭐</span>
                                             <span className={`text-xs font-bold uppercase tracking-wider ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>Rated by Customers</span>
@@ -811,15 +952,15 @@ export default function ChatApp() {
                                 }`}>
                                     <div className="absolute top-0 left-0 w-2 h-full bg-brand-purple"></div>
                                     <h3 className={`text-2xl font-bold mb-4 flex items-center flex-wrap gap-3 ${darkMode ? 'text-dark-text' : 'text-gray-900'}`}>
-                                        Ayubowan 👋 <span className="text-sm font-normal text-brand-purple bg-brand-purple/10 px-3 py-1 rounded-full border border-brand-purple/20">I'm your personal shopping concierge.</span>
+                                        {translations[currentLang].welcomeTitle} <span className="text-sm font-normal text-brand-purple bg-brand-purple/10 px-3 py-1 rounded-full border border-brand-purple/20">{translations[currentLang].welcomeSub}</span>
                                     </h3>
-                                    <p className={`text-sm mb-4 leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>Tell me:</p>
+                                    <p className={`text-sm mb-4 leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>{translations[currentLang].welcomeTellMe}</p>
                                     <ul className={`text-sm space-y-3 mb-6 pl-2 ${darkMode ? 'text-dark-muted' : 'text-gray-700'}`}>
-                                        <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-brand-purple"></span>What occasion is it?</li>
-                                        <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-brand-purple"></span>What's your budget?</li>
-                                        <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-brand-purple"></span>Where should it be delivered?</li>
+                                        <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-brand-purple"></span>{translations[currentLang].welcomeOccasion}</li>
+                                        <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-brand-purple"></span>{translations[currentLang].welcomeBudget}</li>
+                                        <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-brand-purple"></span>{translations[currentLang].welcomeDelivery}</li>
                                     </ul>
-                                    <p className={`text-sm font-bold ${darkMode ? 'text-brand-purple-accent' : 'text-brand-purple'}`}>I'll find the perfect gift instantly.</p>
+                                    <p className={`text-sm font-bold ${darkMode ? 'text-brand-purple-accent' : 'text-brand-purple'}`}>{translations[currentLang].welcomeFooter}</p>
                                 </motion.div>
 
                                 {/* Customer-Focused Benefits */}
@@ -846,15 +987,17 @@ export default function ChatApp() {
 
                                 {/* Suggested Prompts Grid */}
                                 <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="w-full max-w-4xl text-left mt-4">
-                                    <h3 className={`text-xs font-bold uppercase tracking-widest mb-6 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>Try these prompts</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    <h3 className={`text-xs font-bold uppercase tracking-widest mb-6 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>
+                                        {translations[currentLang].tryPrompts}
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                         {[
-                                            { t: "Find a birthday gift under Rs. 10,000", i: "🎂" },
-                                            { t: "Send flowers to Colombo today", i: "💐" },
-                                            { t: "Anniversary gift ideas", i: "🎁" },
-                                            { t: "Premium chocolate hampers", i: "🍫" },
-                                            { t: "Find electronics gifts", i: "📱" },
-                                            { t: "Corporate gifting solutions", i: "🎉" }
+                                            { t: "Find a birthday gift under Rs. 10,000", i: "🎂", sub: "උපන්දින තෑගි" },
+                                            { t: "Send flowers to Colombo today", i: "💐", sub: "මල්" },
+                                            { t: "Anniversary gift ideas", i: "🎁", sub: "ஆண்டுவிழா பரிசுகள்" },
+                                            { t: "Premium chocolate hampers", i: "🍫", sub: "චොකලට් හැම්පර්" },
+                                            { t: "Find electronics gifts", i: "📱", sub: "ඉලෙක්ට්‍රොනික උපකරණ" },
+                                            { t: "Corporate gifting solutions", i: "🏢", sub: "කාර්යාලීය තෑගි / கார்ப்பரேட் பரிசுகள்" }
                                         ].map((p, i) => (
                                             <button 
                                                 key={i}
@@ -864,9 +1007,43 @@ export default function ChatApp() {
                                                 }`}
                                             >
                                                 <span className="text-2xl">{p.i}</span>
-                                                <span className={`text-xs font-semibold ${darkMode ? 'text-dark-text group-hover:text-brand-purple-accent' : 'text-gray-700 group-hover:text-brand-purple'}`}>{p.t}</span>
+                                                <div className="flex flex-col">
+                                                    <span className={`text-xs font-semibold ${darkMode ? 'text-dark-text group-hover:text-brand-purple-accent' : 'text-gray-700 group-hover:text-brand-purple'}`}>{p.t}</span>
+                                                    <span className={`text-[10px] ${darkMode ? 'text-dark-muted/70' : 'text-gray-400'}`}>{p.sub}</span>
+                                                </div>
                                             </button>
                                         ))}
+                                    </div>
+                                </motion.div>
+
+                                {/* Local Trust Section */}
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="w-full max-w-4xl text-left mt-4">
+                                    <div className={`p-6 md:p-8 rounded-3xl border ${
+                                        darkMode ? 'bg-dark-card/40 border-dark-border/80' : 'bg-white border-gray-150 shadow-sm'
+                                    }`}>
+                                        <h3 className={`text-sm font-bold uppercase tracking-widest mb-6 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>
+                                            {translations[currentLang].servingCities}
+                                        </h3>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-6">
+                                            {['Colombo', 'Kandy', 'Galle', 'Jaffna', 'Negombo', 'Batticaloa'].map((city) => (
+                                                <div 
+                                                    key={city}
+                                                    className={`py-3 px-4 rounded-xl border text-center font-semibold text-xs transition-colors ${
+                                                        darkMode ? 'bg-white/5 border-dark-border text-dark-text' : 'bg-gray-50 border-gray-100 text-gray-700'
+                                                    }`}
+                                                >
+                                                    📍 {city}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="flex justify-center">
+                                            <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                                                darkMode ? 'bg-brand-purple/10 border border-brand-purple-accent/30 text-brand-purple-accent' : 'bg-brand-purple/5 border border-brand-purple/25 text-brand-purple'
+                                            }`}>
+                                                <span>⚡</span>
+                                                <span>{translations[currentLang].sameDayBanner}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </motion.div>
 
@@ -1038,9 +1215,10 @@ export default function ChatApp() {
                                                             {/* Quick inspect overlay */}
                                                             <button
                                                                 onClick={() => setActiveProduct(product)}
-                                                                className="absolute top-3 right-3 w-7 h-7 rounded-xl bg-black/30 backdrop-blur-sm text-white text-xs flex items-center justify-center hover:bg-black/50 transition-colors"
+                                                                className="absolute top-3 right-3 w-8 h-8 rounded-xl bg-white/90 dark:bg-dark-card/90 text-brand-purple dark:text-brand-purple-accent shadow-md flex items-center justify-center hover:bg-brand-purple hover:text-white dark:hover:bg-brand-purple dark:hover:text-white transition-all duration-300 hover:scale-110 cursor-pointer border border-brand-purple/10 dark:border-dark-border"
+                                                                title="Inspect Product"
                                                             >
-                                                                🔍
+                                                                <EyeIcon />
                                                             </button>
                                                         </div>
 
@@ -1545,7 +1723,7 @@ export default function ChatApp() {
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            placeholder="What gift are you looking for today?"
+                            placeholder={translations[currentLang].inputPlaceholder}
                             className={`w-full py-4 pl-12 pr-[100px] rounded-full focus-glow transition-all duration-300 text-sm placeholder:tracking-wide shadow-sm ${
                                 darkMode
                                     ? 'bg-dark-card/80 text-dark-text placeholder:text-dark-muted border border-dark-border focus:border-brand-purple/50'

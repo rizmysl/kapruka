@@ -600,24 +600,61 @@ class GiftConciergeController extends Controller
         $text = preg_replace('/\n{3,}/', "\n\n", $text);
         $text = trim($text);
 
+        $lang = $this->detectLanguage($userMessage);
+
         // Standardise responses when stripped or default text is returned
         if (empty($text) || strlen($text) < 10 || str_starts_with(strtolower($text), 'here are your results') || $text === 'Here are your results.') {
             if ($toolName === 'kapruka_search_products') {
-                $text = "Ayubowan! 🎁 I found some great matches in the Kapruka catalog for you. Take a look:";
+                if ($lang === 'si') {
+                    $text = "ආයුබෝවන්! 🎁 මම කපෘක නාමාවලියෙන් ඔබට ගැලපෙන හොඳම දේවල් කිහිපයක් සෙව්වා. බලන්න:";
+                } elseif ($lang === 'ta') {
+                    $text = "வணக்கம்! 🎁 கப்புகா பட்டியலில் உங்களுக்கான சில சிறந்த பொருத்தங்களை நான் கண்டறிந்தேன். பாருங்கள்:";
+                } else {
+                    $text = "Ayubowan! 🎁 I found some great matches in the Kapruka catalog for you. Take a look:";
+                }
             } elseif ($toolName === 'kapruka_get_product') {
-                $text = "Here are the full details for this product — check out the Inspector panel for more! ✨";
+                if ($lang === 'si') {
+                    $text = "මෙන්න මෙම භාණ්ඩයේ සම්පූර්ණ විස්තර — වැඩි විස්තර සඳහා ඉන්ස්පෙක්ටර් පැනලය බලන්න! ✨";
+                } elseif ($lang === 'ta') {
+                    $text = "இந்த தயாரிப்பின் முழு விவரங்கள் இதோ — மேலும் அறிய இன்ஸ்பெக்டர் பேனலைப் பார்க்கவும்! ✨";
+                } else {
+                    $text = "Here are the full details for this product — check out the Inspector panel for more! ✨";
+                }
             } elseif ($toolName === 'kapruka_check_delivery') {
-                $text = "I've checked the delivery options for you — here's what I found: 🚚";
+                if ($lang === 'si') {
+                    $text = "මම ඔබ වෙනුවෙන් බෙදාහැරීමේ තොරතුරු පරීක්ෂා කළා — මට හමු වූ දේ මෙන්න: 🚚";
+                } elseif ($lang === 'ta') {
+                    $text = "உங்களுக்கான டெலிவரி விருப்பங்களை நான் சரிபார்த்தேன் — நான் கண்டறிந்தது இதோ: 🚚";
+                } else {
+                    $text = "I've checked the delivery options for you — here's what I found: 🚚";
+                }
             } elseif ($toolName === 'kapruka_create_order') {
-                $text = "Your order has been created! Use the secure link below to complete your payment: 🛍️";
+                if ($lang === 'si') {
+                    $text = "ඔබගේ ඇණවුම සාර්ථකව නිර්මාණය කළා! ගෙවීම් සම්පූර්ණ කිරීමට පහත සබැඳිය භාවිතා කරන්න: 🛍️";
+                } elseif ($lang === 'ta') {
+                    $text = "உங்கள் ஆர்டர் உருவாக்கப்பட்டது! உங்கள் கட்டணத்தை முடிக்க கீழே உள்ள இணைப்பைப் பயன்படுத்தவும்: 🛍️";
+                } else {
+                    $text = "Your order has been created! Use the secure link below to complete your payment: 🛍️";
+                }
             } elseif ($toolName === 'kapruka_track_order') {
-                $text = "Here's the tracking timeline for your order: 📦";
+                if ($lang === 'si') {
+                    $text = "මෙන්න ඔබගේ ඇණවුම ගමන් කරන ආකාරය: 📦";
+                } elseif ($lang === 'ta') {
+                    $text = "உங்கள் ஆர்டரின் கண்காணிப்பு காலவரிசை இதோ: 📦";
+                } else {
+                    $text = "Here's the tracking timeline for your order: 📦";
+                }
             } else {
-                $text = "Here are the details from the Kapruka database:";
+                if ($lang === 'si') {
+                    $text = "මෙන්න කපෘක දත්ත ගබඩාවෙන් ලැබුණු තොරතුරු:";
+                } elseif ($lang === 'ta') {
+                    $text = "கப்புகா தரவுத்தளத்திலிருந்து விவரங்கள் இதோ:";
+                } else {
+                    $text = "Here are the details from the Kapruka database:";
+                }
             }
         }
 
-        $lang = $this->detectLanguage($userMessage);
         if (is_array($cleanPayload)) {
             $cleanPayload['lang'] = $lang;
         }
