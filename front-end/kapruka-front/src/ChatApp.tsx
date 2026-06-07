@@ -365,7 +365,7 @@ export default function ChatApp() {
                             sidebarCollapsed ? 'p-2.5' : 'w-full px-4 py-2.5'
                         } ${
                             darkMode
-                                ? 'bg-brand-purple/15 border-brand-purple/30 text-brand-purple hover:bg-brand-purple/25'
+                                ? 'bg-brand-purple/15 border-brand-purple/30 text-brand-purple-accent hover:bg-brand-purple/25'
                                 : 'bg-white/15 border-white/30 text-white hover:bg-white/25'
                         }`}
                         title={sidebarCollapsed ? "New Chat" : undefined}
@@ -381,7 +381,7 @@ export default function ChatApp() {
                             sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full px-4 text-left'
                         } ${
                             !showHelp && !showHistory && !activeProduct && !activePayment
-                                ? darkMode ? 'bg-brand-purple/10 text-brand-purple' : 'bg-white/10 text-white'
+                                ? darkMode ? 'bg-brand-purple/10 text-brand-purple-accent' : 'bg-white/10 text-white'
                                 : darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
                         }`}
                         title={sidebarCollapsed ? "Active Chat" : undefined}
@@ -394,7 +394,7 @@ export default function ChatApp() {
                             sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full px-4 text-left'
                         } ${
                             showHelp
-                                ? darkMode ? 'bg-brand-purple/10 text-brand-purple' : 'bg-white/10 text-white'
+                                ? darkMode ? 'bg-brand-purple/10 text-brand-purple-accent' : 'bg-white/10 text-white'
                                 : darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
                         }`}
                         title={sidebarCollapsed ? "How to Use" : undefined}
@@ -407,7 +407,7 @@ export default function ChatApp() {
                             sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full px-4 text-left'
                         } ${
                             showHistory
-                                ? darkMode ? 'bg-brand-purple/10 text-brand-purple' : 'bg-white/10 text-white'
+                                ? darkMode ? 'bg-brand-purple/10 text-brand-purple-accent' : 'bg-white/10 text-white'
                                 : darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
                         }`}
                         title={sidebarCollapsed ? "Order History" : undefined}
@@ -444,7 +444,7 @@ export default function ChatApp() {
                                     sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full gap-2.5 px-3 py-2.5 text-left'
                                 } ${
                                     session.id === activeSessionId
-                                        ? darkMode ? 'bg-brand-purple/15 border border-brand-purple/25' : 'bg-white/15 border border-white/20'
+                                        ? darkMode ? 'bg-brand-purple/15 border border-brand-purple-accent/25' : 'bg-white/15 border border-white/20'
                                         : darkMode ? 'hover:bg-white/5' : 'hover:bg-white/8'
                                 }`}
                                 title={sidebarCollapsed ? session.title : undefined}
@@ -503,7 +503,7 @@ export default function ChatApp() {
                                 ? 'w-10 h-10 justify-center p-0 hover:bg-brand-purple/20 text-white'
                                 : 'w-full justify-between px-4 py-3 bg-white/10 text-white hover:bg-white/15'
                         } ${
-                            !sidebarCollapsed && darkMode ? 'bg-dark-card border border-dark-border text-white hover:bg-brand-purple/20 hover:border-brand-purple/50' : ''
+                            !sidebarCollapsed && darkMode ? 'bg-dark-card border border-dark-border text-white hover:bg-brand-purple/20 hover:border-brand-purple-accent/50' : ''
                         }`}
                         title={sidebarCollapsed ? "Toggle Theme" : undefined}
                     >
@@ -587,7 +587,7 @@ export default function ChatApp() {
                     {/* Left: active chat info */}
                     <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-sm ${
-                            darkMode ? 'bg-brand-purple/20 text-brand-purple' : 'bg-brand-purple/10 text-brand-purple'
+                            darkMode ? 'bg-brand-purple/20 text-brand-purple-accent' : 'bg-brand-purple/10 text-brand-purple'
                         }`}><ChatIcon /></div>
                         <div>
                             <p className={`text-sm font-bold leading-tight ${
@@ -613,16 +613,6 @@ export default function ChatApp() {
                                     {cart.reduce((total, item) => total + item.qty, 0)}
                                 </span>
                             )}
-                        </button>
-                        <button
-                            onClick={startNewChat}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                                darkMode
-                                    ? 'bg-brand-purple/20 text-brand-purple hover:bg-brand-purple hover:text-white border border-brand-purple/30'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-brand-purple hover:text-white'
-                            }`}
-                        >
-                            <span className="flex items-center justify-center"><EditIcon /></span> New Chat
                         </button>
                         <button
                             onClick={() => setDarkMode(!darkMode)}
@@ -654,8 +644,7 @@ export default function ChatApp() {
                                 </span>
                             )}
                         </button>
-                        <button onClick={startNewChat} className="text-white/70 p-2 flex items-center justify-center"><EditIcon /></button>
-                        <button onClick={() => setDarkMode(!darkMode)} className={`p-2 flex items-center justify-center rounded-lg transition-colors ${darkMode ? 'text-brand-purple hover:bg-brand-purple/20' : 'text-white/80 hover:bg-white/20'}`}>
+                        <button onClick={() => setDarkMode(!darkMode)} className={`p-2 flex items-center justify-center rounded-lg transition-colors ${darkMode ? 'text-brand-purple-accent hover:bg-brand-purple/20' : 'text-white/80 hover:bg-white/20'}`}>
                             {darkMode ? <SunIcon /> : <MoonIcon />}
                         </button>
                     </div>
@@ -688,7 +677,7 @@ export default function ChatApp() {
 
                         {/* Welcome Card */}
                         <div className={`rounded-2xl p-6 border ${
-                            darkMode ? 'bg-brand-purple/10 border-brand-purple/20' : 'bg-gradient-to-br from-brand-purple/5 to-brand-purple-light/10 border-brand-purple/15'
+                            darkMode ? 'bg-brand-purple/10 border-brand-purple-accent/20' : 'bg-gradient-to-br from-brand-purple/5 to-brand-purple-light/10 border-brand-purple/15'
                         }`}>
                             <div className="flex items-center gap-4 mb-3">
                                 <div className="w-12 h-12 bg-gradient-to-br from-brand-purple to-brand-purple-light rounded-xl flex items-center justify-center text-2xl shadow-lg shadow-brand-purple/20">
@@ -741,8 +730,8 @@ export default function ChatApp() {
                                         key={idx}
                                         className={`rounded-2xl border overflow-hidden transition-all duration-300 ${
                                             isExpanded
-                                                ? darkMode ? 'bg-brand-purple/10 border-brand-purple/30' : 'bg-brand-purple/5 border-brand-purple/20'
-                                                : darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple/20' : 'bg-white border-gray-100 hover:border-brand-purple/15 shadow-sm'
+                                                ? darkMode ? 'bg-brand-purple/10 border-brand-purple-accent/30' : 'bg-brand-purple/5 border-brand-purple/20'
+                                                : darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple-accent/20' : 'bg-white border-gray-100 hover:border-brand-purple/15 shadow-sm'
                                         }`}
                                     >
                                         <button
@@ -830,7 +819,7 @@ export default function ChatApp() {
                                         <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-brand-purple"></span>What's your budget?</li>
                                         <li className="flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-brand-purple"></span>Where should it be delivered?</li>
                                     </ul>
-                                    <p className={`text-sm font-bold ${darkMode ? 'text-brand-purple-light' : 'text-brand-purple'}`}>I'll find the perfect gift instantly.</p>
+                                    <p className={`text-sm font-bold ${darkMode ? 'text-brand-purple-accent' : 'text-brand-purple'}`}>I'll find the perfect gift instantly.</p>
                                 </motion.div>
 
                                 {/* Customer-Focused Benefits */}
@@ -871,11 +860,11 @@ export default function ChatApp() {
                                                 key={i}
                                                 onClick={() => sendMessage(p.t)}
                                                 className={`text-left p-4 rounded-2xl border transition-all duration-200 flex items-center gap-3 group cursor-pointer hover:-translate-y-1 ${
-                                                    darkMode ? 'bg-dark-card/50 border-dark-border hover:border-brand-purple/50 hover:bg-brand-purple/5' : 'bg-white border-gray-200 hover:border-brand-purple hover:shadow-lg'
+                                                    darkMode ? 'bg-dark-card/50 border-dark-border hover:border-brand-purple-accent/50 hover:bg-brand-purple/5' : 'bg-white border-gray-200 hover:border-brand-purple hover:shadow-lg'
                                                 }`}
                                             >
                                                 <span className="text-2xl">{p.i}</span>
-                                                <span className={`text-xs font-semibold ${darkMode ? 'text-dark-text group-hover:text-brand-purple-light' : 'text-gray-700 group-hover:text-brand-purple'}`}>{p.t}</span>
+                                                <span className={`text-xs font-semibold ${darkMode ? 'text-dark-text group-hover:text-brand-purple-accent' : 'text-gray-700 group-hover:text-brand-purple'}`}>{p.t}</span>
                                             </button>
                                         ))}
                                     </div>
@@ -897,7 +886,7 @@ export default function ChatApp() {
                                                 key={i}
                                                 onClick={() => sendMessage(`Show me gifts for ${occ.title}`)}
                                                 className={`flex flex-col items-center justify-center p-6 rounded-3xl border transition-all duration-300 cursor-pointer hover:-translate-y-1 ${
-                                                    darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple/50' : 'bg-white border-gray-200 shadow-sm hover:shadow-xl hover:border-brand-purple/30'
+                                                    darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple-accent/50' : 'bg-white border-gray-200 shadow-sm hover:shadow-xl hover:border-brand-purple/30'
                                                 }`}
                                             >
                                                 <span className="text-4xl mb-3">{occ.emoji}</span>
@@ -926,7 +915,7 @@ export default function ChatApp() {
                                             { name: "Soft Teddy Bear (Large)", price: "LKR 7,500", img: "🧸" }
                                         ].map((prod, i) => (
                                             <div key={i} className={`min-w-[200px] md:min-w-[240px] snap-start flex flex-col p-4 rounded-3xl border transition-all duration-300 cursor-pointer ${
-                                                darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple' : 'bg-white border-gray-100 shadow-md hover:shadow-xl hover:border-brand-purple/50'
+                                                darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple-accent' : 'bg-white border-gray-100 shadow-md hover:shadow-xl hover:border-brand-purple/50'
                                             }`} onClick={() => sendMessage(`I want to buy a ${prod.name}`)}>
                                                 <div className={`h-32 rounded-2xl flex items-center justify-center text-6xl mb-4 ${darkMode ? 'bg-dark-surface' : 'bg-gray-50'}`}>
                                                     {prod.img}
@@ -946,9 +935,9 @@ export default function ChatApp() {
                                     }`}>
                                         <div className="flex-1 text-center md:text-left">
                                             <h3 className={`text-3xl font-serif font-bold mb-2 ${darkMode ? 'text-dark-text' : 'text-[#002F6C]'}`}>4.8/5 Rating</h3>
-                                            <p className={`text-xs uppercase tracking-widest font-bold ${darkMode ? 'text-brand-purple-light' : 'text-brand-purple'}`}>100+ Verified Reviews</p>
+                                            <p className={`text-xs uppercase tracking-widest font-bold ${darkMode ? 'text-brand-purple-accent' : 'text-brand-purple'}`}>100+ Verified Reviews</p>
                                         </div>
-                                        <div className={`flex-[2] text-sm italic border-l-2 pl-6 py-2 ${darkMode ? 'border-brand-purple/30 text-dark-muted' : 'border-brand-purple/20 text-gray-600'}`}>
+                                        <div className={`flex-[2] text-sm italic border-l-2 pl-6 py-2 ${darkMode ? 'border-brand-purple-accent/30 text-dark-muted' : 'border-brand-purple/20 text-gray-600'}`}>
                                             "Ordered flowers at 10 AM and delivered by lunch. The AI assistant made it incredibly easy. Amazing experience!"
                                             <span className="block mt-2 font-bold not-italic text-xs text-brand-purple">— Sarah M. (Colombo 07)</span>
                                         </div>
@@ -1848,7 +1837,7 @@ export default function ChatApp() {
                                                 {/* Greeting Card Addon Section */}
                                                 <div className={`p-4 rounded-2xl border transition-all duration-300 ${
                                                     addGreetingCard
-                                                        ? darkMode ? 'bg-brand-purple/10 border-brand-purple/40 shadow-lg' : 'bg-[#FDF2F4] border-[#7A1C2C]/20 shadow-md'
+                                                        ? darkMode ? 'bg-brand-purple/10 border-brand-purple-accent/40 shadow-lg' : 'bg-[#FDF2F4] border-[#7A1C2C]/20 shadow-md'
                                                         : darkMode ? 'bg-dark-card/40 border-dark-border/40' : 'bg-white border-gray-100 shadow-sm'
                                                 }`}>
                                                     <div className="flex items-center justify-between">
@@ -2055,7 +2044,7 @@ export default function ChatApp() {
                                             {/* ── LIVE MODE: GREETING CARD ADD-ON ── */}
                                             <div className={`p-4 rounded-2xl transition-all duration-300 border ${
                                                 addGreetingCard
-                                                    ? darkMode ? 'bg-brand-purple/10 border-brand-purple/40 shadow-lg' : 'bg-[#FDF2F4] border-[#7A1C2C]/20 shadow-md'
+                                                    ? darkMode ? 'bg-brand-purple/10 border-brand-purple-accent/40 shadow-lg' : 'bg-[#FDF2F4] border-[#7A1C2C]/20 shadow-md'
                                                     : darkMode ? 'bg-dark-card/40 border-dark-border/40' : 'bg-white border-gray-100 shadow-sm'
                                             }`}>
                                                 <div className="flex items-center justify-between">
