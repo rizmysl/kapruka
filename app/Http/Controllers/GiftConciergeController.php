@@ -539,6 +539,19 @@ class GiftConciergeController extends Controller
         // Extract the clean data payload from the MCP envelope
         $cleanPayload = $this->extractToolPayload($toolResult);
 
+        // Give the LLM a clear hint if the search returned nothing or threw an error
+        $llmContextPayload = $cleanPayload;
+        if ($toolName === 'kapruka_search_products') {
+            $hasNoResults = isset($cleanPayload['results']) && is_array($cleanPayload['results']) && empty($cleanPayload['results']);
+            $hasErrorText = isset($cleanPayload['text_content']) && (str_contains(strtolower($cleanPayload['text_content']), 'no products found') || str_contains(strtolower($cleanPayload['text_content']), 'error'));
+            
+            if ($hasNoResults || $hasErrorText) {
+                $llmContextPayload['_system_directive_'] = "CRITICAL: The search returned ZERO results or an error. You MUST apologize to the user and say you couldn't find any matches. Do NOT say 'Here are your results'.";
+            } else {
+                $llmContextPayload['_system_directive_'] = "SUCCESS: Products found. Write 1-2 friendly sentences introducing the results.";
+            }
+        }
+
         Log::info("[Clean Payload for {$toolName}]", ['keys' => array_keys($cleanPayload)]);
 
         // Rebuild conversation tracking following the official Gemini sequence:
@@ -557,13 +570,13 @@ class GiftConciergeController extends Controller
             ]]
         ];
 
-        // 2. Insert the functionResponse turn — use the clean payload, not the MCP envelope
+        // 2. Insert the functionResponse turn — use the context payload with directives
         $contents[] = [
             'role' => 'function',
             'parts' => [[
                 'functionResponse' => [
                     'name' => $toolName,
-                    'response' => ['result' => $cleanPayload]
+                    'response' => ['result' => $llmContextPayload]
                 ]
             ]]
         ];
@@ -605,12 +618,25 @@ class GiftConciergeController extends Controller
         // Standardise responses when stripped or default text is returned
         if (empty($text) || strlen($text) < 10 || str_starts_with(strtolower($text), 'here are your results') || $text === 'Here are your results.') {
             if ($toolName === 'kapruka_search_products') {
-                if ($lang === 'si') {
-                    $text = "ආයුබෝවන්! 🎁 මම කපෘක නාමාවලියෙන් ඔබට ගැලපෙන හොඳම දේවල් කිහිපයක් සෙව්වා. බලන්න:";
-                } elseif ($lang === 'ta') {
-                    $text = "வணக்கம்! 🎁 கப்புகா பட்டியலில் உங்களுக்கான சில சிறந்த பொருத்தங்களை நான் கண்டறிந்தேன். பாருங்கள்:";
+                $hasNoResults = isset($cleanPayload['results']) && is_array($cleanPayload['results']) && empty($cleanPayload['results']);
+                $hasErrorText = isset($cleanPayload['text_content']) && (str_contains(strtolower($cleanPayload['text_content']), 'no products found') || str_contains(strtolower($cleanPayload['text_content']), 'error'));
+
+                if ($hasNoResults || $hasErrorText) {
+                    if ($lang === 'si') {
+                        $text = "සමාවෙන්න! මට ඒ සඳහා ගැලපෙන භාණ්ඩ කිසිවක් සොයාගත නොහැකි විය. කරුණාකර වෙනත් නමකින් උත්සාහ කරන්න.";
+                    } elseif ($lang === 'ta') {
+                        $text = "மன்னிக்கவும்! இதற்கான எந்தப் பொருட்களையும் என்னால் கண்டுபிடிக்க முடியவில்லை. தயவுசெய்து வேறு பெயரில் முயற்சிக்கவும்.";
+                    } else {
+                        $text = "Aiyo! I'm so sorry, but I couldn't find any products matching your search right now. Could we try a broader search or different keywords?";
+                    }
                 } else {
-                    $text = "Ayubowan! 🎁 I found some great matches in the Kapruka catalog for you. Take a look:";
+                    if ($lang === 'si') {
+                        $text = "ආයුබෝවන්! 🎁 මම කපෘක නාමාවලියෙන් ඔබට ගැලපෙන හොඳම දේවල් කිහිපයක් සෙව්වා. බලන්න:";
+                    } elseif ($lang === 'ta') {
+                        $text = "வணக்கம்! 🎁 கப்புகா பட்டியலில் உங்களுக்கான சில சிறந்த பொருத்தங்களை நான் கண்டறிந்தேன். பாருங்கள்:";
+                    } else {
+                        $text = "Ayubowan! 🎁 I found some great matches in the Kapruka catalog for you. Take a look:";
+                    }
                 }
             } elseif ($toolName === 'kapruka_get_product') {
                 if ($lang === 'si') {
@@ -721,6 +747,7 @@ class GiftConciergeController extends Controller
                     "- NEVER output JSON, code blocks, raw data, or product arrays in text responses.\n" .
                     "- NEVER echo or repeat tool result contents.\n" .
                     "- After a tool call: write ONLY 1-3 friendly, conversational sentences in the active language. The UI renders all data visually.\n" .
+                    "- IMPORTANT: If a tool response indicates an error, or if NO products are found, apologize politely and suggest alternative keywords or a broader search. Do NOT confidently say \"Here are your results\" if the array is empty!\n" .
                     "- Search Guardrails: Extract ONLY the core single noun (e.g., 'delicious chocolate cake for birthday' → 'cake'). Never include prices or adjectives in searches.\n" .
                     "- If you feel like pasting JSON — STOP. Write a warm sentence instead."
             ]]

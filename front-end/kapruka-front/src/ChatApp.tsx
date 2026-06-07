@@ -35,6 +35,9 @@ interface ChatSession {
   createdAt: number;
 }
 
+const shoppingPattern = `url('data:image/svg+xml;utf8,<svg width="150" height="150" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 20 30 h 20 v 20 h -20 z"/><path d="M 30 30 v 20"/><path d="M 20 40 h 20"/><path d="M 30 30 c -4 -6 -10 -2 -5 2 c 5 4 5 -2 5 -2"/><path d="M 30 30 c 4 -6 10 -2 5 2 c -5 4 -5 -2 -5 -2"/><path d="M 100 25 c -3 -3 -8 -3 -11 0 c -2 2 -3 5 -2 8 c 2 6 13 15 13 15 s 11 -9 13 -15 c 1 -3 0 -6 -2 -8 c -3 -3 -8 -3 -11 0 z" fill="black"/><path d="M 25 100 h 16 l 2 20 h -20 z"/><path d="M 29 100 a 4 4 0 0 1 8 0"/><path d="M 105 110 c -5 -5 0 -12 5 -7 c 5 -5 12 0 7 5 c 5 5 0 12 -5 7 c -5 5 -12 0 -7 -5 z"/><circle cx="110" cy="115" r="2" fill="black"/><path d="M 60 20 l 2 6 l 6 2 l -6 2 l -2 6 l -2 -6 l -6 -2 l 6 -2 z" fill="black" stroke="none"/><path d="M 55 80 l 10 0 l -2 10 l -6 0 z"/><path d="M 53 80 c 0 -8 14 -8 14 0" fill="black"/><circle cx="60" cy="70" r="1.5" fill="black" stroke="none"/><path d="M 125 65 c -5 -5 -10 5 0 5 c 10 -5 5 -15 0 -5 z"/><path d="M 80 120 c 5 -10 15 -10 10 0 c -2 5 -8 5 -10 0 z"/><path d="M 85 122 v 10"/><path d="M 130 90 c -2 0 -4 -2 -4 -4 v -10 c 0 -2 2 -4 4 -4 h 10 c 2 0 4 2 4 4 v 10 c 0 2 -2 4 -4 4 z"/><path d="M 135 80 l -5 10"/><path d="M 40 130 c -2 -2 -5 -2 -7 0 c -2 2 -2 5 0 7 c 2 2 5 2 7 0 c 2 -2 2 -5 0 -7 z"/><path d="M 15 65 h 5 v 5 h -5 z" fill="black"/></svg>')`;
+
+
 const translations = {
     en: {
         heroTitle: "Your Personal AI Shopping Concierge",
@@ -47,8 +50,8 @@ const translations = {
         welcomeBudget: "What's your budget?",
         welcomeDelivery: "Where should it be delivered?",
         welcomeFooter: "I'll find the perfect gift instantly.",
-        trustIndicator: "English • සිංහල • தமிழ் Support Available",
-        trustIndicatorSub: "Customers can chat naturally in English, Sinhala, or Tamil.",
+        trustIndicator: "Chat in English, සිංහල, or தமிழ்",
+        trustIndicatorSub: "Type naturally. Mix languages, use Singlish or Tanglish—our AI understands exactly what you mean.",
         servingCities: "Serving customers across Sri Lanka",
         sameDayBanner: "Same-Day Delivery Available in Selected Areas",
         tryPrompts: "Try these prompts",
@@ -408,7 +411,14 @@ export default function ChatApp() {
 
         const history = updatedMessages
             .slice(1, -1)
-            .map(msg => ({ role: msg.role === 'user' ? 'user' : 'model', parts: [{ text: msg.text }] }))
+            .map(msg => {
+                let historyText = msg.text;
+                if (msg.role === 'model' && msg.tool && msg.raw_data) {
+                    const filters = msg.raw_data.applied_filters ? JSON.stringify(msg.raw_data.applied_filters) : '';
+                    historyText += `\n[System internal memory: I previously executed ${msg.tool} tool with filters: ${filters}]`;
+                }
+                return { role: msg.role === 'user' ? 'user' : 'model', parts: [{ text: historyText }] };
+            })
             .slice(-20);
 
         try {
@@ -704,7 +714,19 @@ export default function ChatApp() {
             </div>
 
             {/* ═══════════════ PANE 2: CHAT FEED ═══════════════ */}
-            <div className="flex-1 flex flex-col relative h-full noise-bg">
+            <div className={`flex-1 flex flex-col relative h-full noise-bg ${darkMode ? 'bg-[#121212]' : 'bg-[#E5E5E5]'}`}>
+                {/* WhatsApp style shopping doodle background */}
+                <div 
+                    className={`absolute inset-0 pointer-events-none z-0 transition-opacity duration-500 ${darkMode ? 'bg-white opacity-[0.03]' : 'bg-[#002F6C] opacity-[0.04]'}`}
+                    style={{
+                        maskImage: shoppingPattern,
+                        WebkitMaskImage: shoppingPattern,
+                        maskRepeat: 'repeat',
+                        WebkitMaskRepeat: 'repeat',
+                        maskSize: '180px',
+                        WebkitMaskSize: '180px',
+                    }}
+                />
 
                 {/* ── Global Alert Bar ── */}
                 <div className="w-full bg-red-600 dark:bg-red-900/40 text-white text-center py-1.5 px-4 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 z-20 relative">
@@ -970,7 +992,7 @@ export default function ChatApp() {
                                     <p className="text-brand-purple dark:text-brand-purple-accent text-xs font-bold uppercase tracking-[0.25em] bg-brand-purple/10 px-4 py-1.5 rounded-full border border-brand-purple/20">
                                         {translations[currentLang].heroSub}
                                     </p>
-                                    <h2 className="text-4xl md:text-6xl font-serif font-bold tracking-tight leading-tight max-w-3xl">
+                                    <h2 className={`text-5xl md:text-7xl font-serif font-black tracking-tighter leading-[0.95] max-w-4xl bg-clip-text text-transparent pb-2 drop-shadow-sm ${darkMode ? 'bg-gradient-to-br from-white via-gray-300 to-gray-500' : 'bg-gradient-to-br from-gray-900 via-gray-700 to-gray-500'}`}>
                                         {translations[currentLang].heroTitle}
                                     </h2>
                                     <p className={`text-sm md:text-base max-w-2xl leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>
@@ -1006,6 +1028,29 @@ export default function ChatApp() {
                                             <span className="text-[10px] opacity-70">🎁</span> <span>5,000+ DELIVERED</span>
                                         </div>
                                     </div>
+
+                                    {/* Scroll Down Indicator */}
+                                    <motion.div 
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 0.8, duration: 0.5 }}
+                                        className="mt-8 mb-4 flex flex-col items-center justify-center cursor-pointer group"
+                                        onClick={() => {
+                                            const chatContainer = document.querySelector('.overflow-y-auto.z-10');
+                                            if (chatContainer) chatContainer.scrollBy({ top: 450, behavior: 'smooth' });
+                                        }}
+                                    >
+                                        <span className={`text-[10px] font-bold tracking-widest uppercase mb-3 transition-colors ${darkMode ? 'text-dark-muted group-hover:text-brand-purple-accent' : 'text-gray-500 group-hover:text-brand-purple'}`}>
+                                            Scroll to explore
+                                        </span>
+                                        <motion.div
+                                            animate={{ y: [0, 8, 0] }}
+                                            transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                                            className={`w-11 h-11 rounded-full flex items-center justify-center shadow-sm transition-all duration-300 ${darkMode ? 'bg-dark-card border border-brand-purple-accent/30 text-brand-purple-accent group-hover:bg-brand-purple/20' : 'bg-white border border-brand-purple/20 text-brand-purple group-hover:shadow-md group-hover:border-brand-purple'}`}
+                                        >
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                        </motion.div>
+                                    </motion.div>
                                 </motion.div>
 
                                 {/* Customer-Focused Benefits */}
@@ -1035,27 +1080,29 @@ export default function ChatApp() {
                                     <h3 className={`text-xs font-bold uppercase tracking-widest mb-6 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>
                                         {translations[currentLang].tryPrompts}
                                     </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                                         {[
-                                            { t: "Find a birthday gift under Rs. 10,000", i: "🎂", sub: "උපන්දින තෑගි" },
-                                            { t: "Send flowers to Colombo today", i: "💐", sub: "මල්" },
-                                            { t: "Anniversary gift ideas", i: "🎁", sub: "ஆண்டுவிழா பரிசுகள்" },
-                                            { t: "Premium chocolate hampers", i: "🍫", sub: "චොකලට් හැම්පර්" },
-                                            { t: "Find electronics gifts", i: "📱", sub: "ඉලෙක්ට්‍රොනික උපකරණ" },
-                                            { t: "Corporate gifting solutions", i: "🏢", sub: "කාර්යාලීය තෑගි / கார்ப்பரேட் பரிசுகள்" }
+                                            { t: "Find gifts under Rs. 5,000", i: "🏷️", sub: "Budget Friendly" },
+                                            { t: "Gifts from Rs. 5k - 10k", i: "🎁", sub: "Mid-Range" },
+                                            { t: "Premium Luxury Gifts", i: "💎", sub: "High-End" },
+                                            { t: "Anniversary hampers", i: "🥂", sub: "Popular" },
+                                            { t: "මට උපන්දින කේක් පෙන්නන්න", i: "🎂", sub: "Sinhala (සිංහල)" },
+                                            { t: "எனக்கு சாக்லேட் வேண்டும்", i: "🍫", sub: "Tamil (தமிழ்)" },
+                                            { t: "Kandy walata mal yawanna", i: "💐", sub: "Singlish" },
+                                            { t: "Colombo delivery venuma", i: "🚚", sub: "Tanglish" }
                                         ].map((p, i) => (
                                             <button 
                                                 key={i}
                                                 onClick={() => sendMessage(p.t)}
-                                                className={`text-left p-4 rounded-2xl border transition-all duration-200 flex items-center gap-3 group cursor-pointer hover:-translate-y-1 ${
+                                                className={`text-left p-4 rounded-2xl border transition-all duration-200 flex flex-col items-start gap-2 group cursor-pointer hover:-translate-y-1 ${
                                                     darkMode ? 'bg-dark-card/50 border-dark-border hover:border-brand-purple-accent/50 hover:bg-brand-purple/5' : 'bg-white border-gray-200 hover:border-brand-purple hover:shadow-lg'
                                                 }`}
                                             >
-                                                <span className="text-2xl">{p.i}</span>
-                                                <div className="flex flex-col">
-                                                    <span className={`text-xs font-semibold ${darkMode ? 'text-dark-text group-hover:text-brand-purple-accent' : 'text-gray-700 group-hover:text-brand-purple'}`}>{p.t}</span>
-                                                    <span className={`text-[10px] ${darkMode ? 'text-dark-muted/70' : 'text-gray-400'}`}>{p.sub}</span>
+                                                <div className="flex items-center gap-2 w-full mb-1">
+                                                    <span className="text-xl">{p.i}</span>
+                                                    <span className={`text-[10px] uppercase font-bold tracking-widest ${darkMode ? 'text-dark-muted/70' : 'text-gray-400'}`}>{p.sub}</span>
                                                 </div>
+                                                <span className={`text-xs font-semibold leading-relaxed ${darkMode ? 'text-dark-text group-hover:text-brand-purple-accent' : 'text-gray-700 group-hover:text-brand-purple'}`}>{p.t}</span>
                                             </button>
                                         ))}
                                     </div>
@@ -1755,49 +1802,6 @@ export default function ChatApp() {
 
                 {/* ── Input Area ── */}
                 <div className="p-4 md:p-6 pt-0 relative z-10">
-                    <AnimatePresence>
-                        {!isLoading && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: 10 }}
-                                className="flex flex-col gap-2 mb-4 mt-8"
-                            >
-                                <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1 items-center">
-                                    <span className={`text-[10px] font-bold uppercase tracking-widest whitespace-nowrap mr-2 ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>Popular:</span>
-                                    {['🎂 Birthday cake delivery', '💐 Flower bouquets', '🍫 Chocolate gifts', '🎁 Anniversary hampers'].map((chip, index) => (
-                                        <button
-                                            key={index}
-                                            onClick={() => sendMessage(chip)}
-                                            className={`whitespace-nowrap px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all duration-200 ${
-                                                darkMode
-                                                    ? 'bg-dark-card/50 text-dark-text border border-dark-border hover:border-brand-purple hover:text-brand-purple'
-                                                    : 'bg-white text-gray-600 border border-gray-200 hover:border-brand-purple hover:text-brand-purple'
-                                            }`}
-                                        >
-                                            {chip}
-                                        </button>
-                                    ))}
-                                </div>
-                                <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-3 items-center">
-                                    <span className={`text-[10px] font-bold uppercase tracking-widest whitespace-nowrap mr-2 ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>Budget:</span>
-                                    {['Under Rs. 5,000', 'Rs. 5,000 – 10,000', 'Rs. 10,000 – 25,000', '💎 Premium Gifts'].map((chip, index) => (
-                                        <button
-                                            key={index}
-                                            onClick={() => sendMessage(`Find gifts ${chip}`)}
-                                            className={`whitespace-nowrap px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all duration-200 ${
-                                                darkMode
-                                                    ? 'bg-dark-card/50 text-dark-text border border-dark-border hover:border-brand-purple hover:text-brand-purple'
-                                                    : 'bg-white text-gray-600 border border-gray-200 hover:border-brand-purple hover:text-brand-purple'
-                                            }`}
-                                        >
-                                            {chip}
-                                        </button>
-                                    ))}
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
 
                     <form onSubmit={sendMessage} className="relative flex items-center w-full">
                         <button type="button" onClick={() => alert('Image upload coming soon!')} className={`absolute left-2 p-2 rounded-full transition-colors cursor-pointer ${darkMode ? 'text-dark-muted hover:text-dark-text hover:bg-white/10' : 'text-gray-400 hover:text-brand-purple hover:bg-brand-purple/10'}`}>
