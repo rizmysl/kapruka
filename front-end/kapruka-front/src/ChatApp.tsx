@@ -218,6 +218,65 @@ export default function ChatApp() {
     const [activePayment, setActivePayment] = useState<any>(null);
     const [iframeLoading, setIframeLoading] = useState(true);
 
+    // ── Voice Input State ──
+    const [isRecording, setIsRecording] = useState(false);
+    const recognitionRef = useRef<any>(null);
+
+    // Initialize Web Speech API
+    const sendMessageRef = useRef<any>(null);
+
+    useEffect(() => {
+        if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            recognitionRef.current = new SpeechRecognition();
+            recognitionRef.current.continuous = false;
+            recognitionRef.current.interimResults = false;
+            
+            recognitionRef.current.onstart = () => setIsRecording(true);
+            
+            recognitionRef.current.onresult = (event: any) => {
+                let newTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        newTranscript += event.results[i][0].transcript;
+                    }
+                }
+                const finalStr = newTranscript.trim();
+                if (finalStr && sendMessageRef.current) {
+                    sendMessageRef.current(finalStr);
+                }
+            };
+            
+            recognitionRef.current.onerror = (event: any) => {
+                console.error("Speech recognition error", event.error);
+                setIsRecording(false);
+            };
+            
+            recognitionRef.current.onend = () => setIsRecording(false);
+        }
+    }, []);
+
+    // Update recognition language
+    useEffect(() => {
+        if (recognitionRef.current) {
+            const langMap = { en: 'en-US', si: 'si-LK', ta: 'ta-LK' };
+            recognitionRef.current.lang = langMap[currentLang as keyof typeof langMap] || 'en-US';
+        }
+    }, [currentLang]);
+
+    const toggleRecording = () => {
+        if (!recognitionRef.current) {
+            alert("Your browser does not support voice input.");
+            return;
+        }
+        if (isRecording) {
+            recognitionRef.current.stop();
+        } else {
+            recognitionRef.current.start();
+        }
+    };
+
+
     // ── Ghost Typing Indicator for Placeholder ──
     const [placeholderIndex, setPlaceholderIndex] = useState(0);
     const [placeholderText, setPlaceholderText] = useState('');
@@ -384,6 +443,10 @@ export default function ChatApp() {
             setIsLoading(false);
         }
     };
+
+    useEffect(() => {
+        sendMessageRef.current = sendMessage;
+    }, [sendMessage]);
 
     return (
         <div className={`flex h-screen w-full overflow-hidden font-sans transition-colors duration-300 ${darkMode ? 'bg-dark-bg' : 'bg-gradient-to-br from-indigo-50 via-white to-purple-50 animate-mesh'}`}>
@@ -1732,7 +1795,16 @@ export default function ChatApp() {
                             disabled={isLoading}
                         />
                         <div className="absolute right-1.5 flex items-center gap-1">
-                            <button type="button" onClick={() => alert('Voice input coming soon!')} className={`p-2 rounded-full transition-colors cursor-pointer ${darkMode ? 'text-dark-muted hover:text-dark-text hover:bg-white/10' : 'text-gray-400 hover:text-brand-purple hover:bg-brand-purple/10'}`}>
+                            <button 
+                                type="button" 
+                                onClick={toggleRecording} 
+                                className={`p-2 rounded-full transition-all duration-300 cursor-pointer ${
+                                    isRecording 
+                                        ? 'bg-red-500 text-white animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)]' 
+                                        : darkMode ? 'text-dark-muted hover:text-dark-text hover:bg-white/10' : 'text-gray-400 hover:text-brand-purple hover:bg-brand-purple/10'
+                                }`}
+                                title={isRecording ? 'Listening...' : 'Voice Input'}
+                            >
                                 <MicrophoneIcon />
                             </button>
                             <button
