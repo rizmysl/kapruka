@@ -1911,6 +1911,80 @@ export default function ChatApp() {
                                                     Open Checkout In New Window ↗️
                                                 </a>
                                             </div>
+
+                                            {/* ── LIVE MODE: GREETING CARD ADD-ON ── */}
+                                            <div className={`p-4 rounded-2xl transition-all duration-300 border ${
+                                                addGreetingCard
+                                                    ? darkMode ? 'bg-brand-purple/10 border-brand-purple/40 shadow-lg' : 'bg-[#FDF2F4] border-[#7A1C2C]/20 shadow-md'
+                                                    : darkMode ? 'bg-dark-card/40 border-dark-border/40' : 'bg-white border-gray-100 shadow-sm'
+                                            }`}>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-lg">💌</span>
+                                                        <div>
+                                                            <h4 className={`text-xs font-bold ${darkMode ? 'text-dark-text' : 'text-[#002F6C]'}`}>Add Premium Greeting Card</h4>
+                                                            <p className={`text-[10px] ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>Handwritten card with your order (+ LKR 250)</p>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => setAddGreetingCard(!addGreetingCard)}
+                                                        className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${
+                                                            addGreetingCard ? 'bg-brand-purple' : 'bg-gray-300 dark:bg-dark-border'
+                                                        }`}
+                                                    >
+                                                        <motion.div
+                                                            animate={{ x: addGreetingCard ? 20 : 0 }}
+                                                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                                            className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-md"
+                                                        />
+                                                    </button>
+                                                </div>
+
+                                                {addGreetingCard && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, height: 0 }}
+                                                        animate={{ opacity: 1, height: 'auto' }}
+                                                        exit={{ opacity: 0, height: 0 }}
+                                                        className="mt-4 pt-3 border-t border-dashed border-gray-200 dark:border-dark-border/50 space-y-3.5 text-xs"
+                                                    >
+                                                        <div>
+                                                            <label className={`block font-semibold mb-1 ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Occasion</label>
+                                                            <select
+                                                                value={cardOccasion}
+                                                                onChange={(e) => setCardOccasion(e.target.value)}
+                                                                className={`w-full p-2.5 rounded-xl border text-xs focus:ring-2 focus:ring-brand-purple focus:outline-none ${
+                                                                    darkMode ? 'bg-dark-card border-dark-border text-dark-text' : 'bg-white border-gray-200 text-gray-800'
+                                                                }`}
+                                                            >
+                                                                <option value="Birthday">Birthday 🎂</option>
+                                                                <option value="Anniversary">Anniversary 💍</option>
+                                                                <option value="Love / Valentine">Love / Romance ❤️</option>
+                                                                <option value="Congratulations">Congratulations 🎉</option>
+                                                                <option value="Get Well Soon">Get Well Soon 🩹</option>
+                                                                <option value="Thank You">Thank You 🙏</option>
+                                                            </select>
+                                                        </div>
+
+                                                        <div>
+                                                            <label className={`block font-semibold mb-1 ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Handwritten Message (Optional)</label>
+                                                            <textarea
+                                                                value={cardMessage}
+                                                                onChange={(e) => setCardMessage(e.target.value)}
+                                                                placeholder="Write a custom warm message..."
+                                                                maxLength={300}
+                                                                rows={3}
+                                                                className={`w-full p-2.5 rounded-xl border text-xs focus:ring-2 focus:ring-brand-purple focus:outline-none resize-none ${
+                                                                    darkMode ? 'bg-dark-card border-dark-border text-dark-text' : 'bg-white border-gray-200 text-gray-800'
+                                                                }`}
+                                                            />
+                                                            <div className="flex justify-between items-center mt-1">
+                                                                <p className={`text-[9px] ${darkMode ? 'text-brand-purple' : 'text-[#7A1C2C]'}`}>*This message will be attached to the final order</p>
+                                                                <span className={`text-[9px] ${darkMode ? 'text-dark-muted' : 'text-gray-400'}`}>{cardMessage.length}/300</span>
+                                                            </div>
+                                                        </div>
+                                                    </motion.div>
+                                                )}
+                                            </div>
                                             <div className={`flex-1 rounded-2xl overflow-hidden border relative ${
                                                 darkMode ? 'border-dark-border bg-black' : 'border-gray-200 bg-white'
                                             }`}>
