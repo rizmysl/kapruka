@@ -574,16 +574,6 @@ export default function ChatApp() {
                 }`}>
                     {/* Left: active chat info */}
                     <div className="flex items-center gap-3">
-                        {sidebarCollapsed && (
-                            <button
-                                onClick={() => setSidebarCollapsed(false)}
-                                className={`p-1.5 rounded-lg transition-colors cursor-pointer mr-1 ${
-                                    darkMode ? 'text-dark-muted hover:bg-white/5 hover:text-dark-text' : 'text-gray-500 hover:bg-gray-100'
-                                }`}
-                            >
-                                <SidebarIcon />
-                            </button>
-                        )}
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-sm ${
                             darkMode ? 'bg-brand-purple/20 text-brand-purple' : 'bg-brand-purple/10 text-brand-purple'
                         }`}><ChatIcon /></div>
