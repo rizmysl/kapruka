@@ -93,6 +93,12 @@ body {
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+.dark .gradient-text {
+  background: linear-gradient(135deg, #A17BD9, #C8A2C8, #E6E6FA);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
 
 /* ─── Focus Glow Ring ─── */
 .focus-glow:focus {
