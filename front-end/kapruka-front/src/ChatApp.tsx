@@ -1382,7 +1382,26 @@ export default function ChatApp() {
                                     {msg.tool === 'kapruka_list_delivery_cities' && msg.raw_data && (() => {
                                         const cityData = getParsedData(msg.raw_data);
                                         const cities = cityData?.cities || (Array.isArray(cityData) ? cityData : null);
-                                        if (!cities || !Array.isArray(cities)) return null;
+                                        if (!cities || !Array.isArray(cities)) {
+                                            const mdText = msg.raw_data?.result || msg.raw_data?.structuredContent?.result || msg.raw_data?.text_content || JSON.stringify(msg.raw_data);
+                                            return mdText ? (
+                                                <div className={`mt-4 p-4 rounded-2xl border prose prose-sm max-w-none text-sm ${
+                                                    darkMode ? 'bg-dark-card/50 border-dark-border text-dark-text' : 'bg-[#FDF2F4]/50 border-[#7A1C2C]/10 text-gray-800'
+                                                }`}>
+                                                    <ReactMarkdown>{mdText}</ReactMarkdown>
+                                                </div>
+                                            ) : null;
+                                        }
+
+                                        if (cities.length === 0) {
+                                            return (
+                                                <div className={`mt-4 p-4 rounded-2xl border prose prose-sm max-w-none text-sm ${
+                                                    darkMode ? 'bg-dark-card/50 border-dark-border text-dark-text' : 'bg-[#FDF2F4]/50 border-[#7A1C2C]/10 text-gray-800'
+                                                }`}>
+                                                    <p>No delivery cities found matching that query. Please try another city.</p>
+                                                </div>
+                                            );
+                                        }
 
                                         return (
                                             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 flex flex-wrap gap-2">
@@ -2171,7 +2190,8 @@ export default function ChatApp() {
                                 <button
                                     onClick={() => {
                                         setShowCartPanel(false);
-                                        sendMessage(`I want to checkout my cart containing: ${cart.map(i => `${i.name} (x${i.qty})`).join(', ')}`);
+                                        const itemsStr = cart.map(i => `- ${i.qty}x ${i.name} (ID: ${i.id})`).join('\n');
+                                        sendMessage(`I am ready to checkout with the following items in my cart:\n${itemsStr}\n\nPlease ask me for the recipient, delivery address, and sender details step-by-step so we can create the order!`);
                                     }}
                                     className="w-full py-3 bg-gradient-to-r from-brand-purple to-brand-purple-dark text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all duration-300 text-center cursor-pointer uppercase tracking-wider"
                                 >
