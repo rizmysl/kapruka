@@ -40,11 +40,11 @@ const shoppingPattern = `url('data:image/svg+xml;utf8,<svg width="150" height="1
 
 const translations = {
     en: {
-        heroTitle: "Your Personal AI Shopping Concierge",
+        heroTitle: "Meet Ayla, your Personal AI Shopping Concierge",
         heroSub: "ආයුබෝවන් • வணக்கம் • Welcome",
         heroDesc: "Find gifts, flowers, cakes, electronics, and essentials with AI-powered assistance and island-wide delivery.",
         welcomeTitle: "ආයුබෝවන් 👋 | வணக்கம் 👋",
-        welcomeSub: "I'm your personal shopping concierge.",
+        welcomeSub: "I'm Ayla, your personal shopping concierge.",
         welcomeTellMe: "Tell me:",
         welcomeOccasion: "What occasion is it?",
         welcomeBudget: "What's your budget?",
@@ -59,11 +59,11 @@ const translations = {
         inputPlaceholder: "What gift are you looking for today?",
     },
     si: {
-        heroTitle: "ඔබේ පෞද්ගලික AI සාප්පු සවාරි සහායකයා",
+        heroTitle: "ඔබේ පෞද්ගලික AI සාප්පු සවාරි සහායකයා වන Ayla හමුවන්න",
         heroSub: "ආයුබෝවන් • வணக்கம் • Welcome",
         heroDesc: "මල්, කේක්, තෑගි, ඉලෙක්ට්‍රොනික උපකරණ සහ අනෙකුත් දෑ AI සහාය ඇතිව දිවයින පුරා බෙදාහැරීමේ සේවාව සමගින් සොයාගන්න.",
         welcomeTitle: "ආයුබෝවන් 👋 | வணக்கம் 👋",
-        welcomeSub: "මම ඔබේ පෞද්ගලික සාප්පු සවාරි සහායකයා.",
+        welcomeSub: "මම Ayla, ඔබේ පෞද්ගලික සාප්පු සවාරි සහායකයා.",
         welcomeTellMe: "මට පවසන්න:",
         welcomeOccasion: "උත්සවය කුමක්ද?",
         welcomeBudget: "ඔබේ අයවැය කොපමණද?",
@@ -78,11 +78,11 @@ const translations = {
         inputPlaceholder: "අද ඔබ සොයන්නේ කුමන ආකාරයේ තෑග්ගක්ද?",
     },
     ta: {
-        heroTitle: "உங்கள் தனிப்பட்ட AI ஷாப்பிங் உதவியாளர்",
+        heroTitle: "உங்கள் தனிப்பட்ட AI ஷாப்பிங் உதவியாளர் Ayla ஐ சந்தியுங்கள்",
         heroSub: "வணக்கம் • Welcome • ஆயுபோவன்",
         heroDesc: "பூக்கள், கேக்குகள், பரிசுகள், மின்னணு பொருட்கள் மற்றும் பிறவற்றை AI உதவியுடன் நாடு தழுவிய விநியோகத்துடன் கண்டறியுங்கள்.",
         welcomeTitle: "ආයුබෝවන් 👋 | வணக்கம் 👋",
-        welcomeSub: "நான் உங்கள் தனிப்பட்ட ஷாப்பிங் உதவியாளர்.",
+        welcomeSub: "நான் Ayla, உங்கள் தனிப்பட்ட ஷாப்பிங் உதவியாளர்.",
         welcomeTellMe: "எனக்குச் சொல்லுங்கள்:",
         welcomeOccasion: "என்ன சந்தர்ப்பம்?",
         welcomeBudget: "உங்கள் வரவுசெலவுத் திட்டம் என்ன?",
@@ -479,7 +479,7 @@ export default function ChatApp() {
                                 <span className="text-white">apruka</span>
                             </h1>
                             <p className={`text-[10px] mt-1 font-semibold tracking-[0.2em] uppercase ${darkMode ? 'text-dark-muted' : 'text-white/50'}`}>
-                                Gift Concierge · AI
+                                Ayla · AI Concierge
                             </p>
                         </div>
                     ) : (
@@ -821,7 +821,7 @@ export default function ChatApp() {
                             <button onClick={() => setMobileSidebarOpen(true)} className={`relative z-30 p-2 cursor-pointer flex items-center justify-center rounded-lg transition-colors ${darkMode ? 'text-white hover:bg-white/10' : 'text-white/80 hover:bg-white/20'}`}>
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                             </button>
-                            <h1 className="text-base font-bold text-white whitespace-nowrap">Kapruka Concierge</h1>
+                            <h1 className="text-base font-bold text-white whitespace-nowrap">Ayla</h1>
                         </div>
                         <div className="flex items-center gap-1 z-30">
                             <button onClick={() => { setMobileSidebarOpen(false); startNewChat(); }} className={`relative z-30 p-2 cursor-pointer flex items-center justify-center rounded-lg transition-colors ${darkMode ? 'text-brand-purple-accent hover:bg-brand-purple/20' : 'text-white/80 hover:bg-white/20'}`}>
@@ -873,7 +873,7 @@ export default function ChatApp() {
                         <div className="flex justify-between items-center pb-4 border-b border-gray-200 dark:border-dark-border">
                             <div>
                                 <h2 className="text-2xl md:text-3xl font-black tracking-tight leading-tight">
-                                    How to Use <span className="bg-gradient-to-r from-brand-purple via-brand-purple-light to-[#A17BD9] bg-clip-text text-transparent">Kapruka Concierge</span>
+                                    How to Chat with <span className="bg-gradient-to-r from-brand-purple via-brand-purple-light to-[#A17BD9] bg-clip-text text-transparent">Ayla</span>
                                 </h2>
                                 <p className={`text-[10px] font-extrabold tracking-[0.25em] uppercase mt-1 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>
                                     Frequently Asked Questions &amp; Guide
@@ -900,7 +900,7 @@ export default function ChatApp() {
                                     🎁
                                 </div>
                                 <div>
-                                    <h3 className={`font-bold text-base ${darkMode ? 'text-dark-text' : 'text-gray-900'}`}>Welcome to Kapruka Concierge</h3>
+                                    <h3 className={`font-bold text-base ${darkMode ? 'text-dark-text' : 'text-gray-900'}`}>Meet Ayla</h3>
                                     <p className={`text-xs mt-0.5 ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Your AI-powered gift shopping assistant for Sri Lanka</p>
                                 </div>
                             </div>
@@ -940,7 +940,7 @@ export default function ChatApp() {
                         <div className="max-w-4xl w-full mx-auto space-y-4 pb-10">
                             <div className="text-center mb-8">
                                 <h3 className={`text-2xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Frequently Asked Questions</h3>
-                                <p className={`text-sm ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Everything you need to know about shopping with our AI Concierge.</p>
+                                <p className={`text-sm ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Everything you need to know about shopping with Ayla.</p>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {faqs.map((faq, idx) => {
