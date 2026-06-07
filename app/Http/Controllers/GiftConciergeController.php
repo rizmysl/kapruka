@@ -664,6 +664,7 @@ class GiftConciergeController extends Controller
                     "  3. Sender details (Name, Phone number).\n" .
                     "  4. Complete delivery address and the preferred delivery date.\n" .
                     "  5. (If it's a gift) A custom gift message.\n\n" .
+                    "CRITICAL CHECKOUT RULE: Do NOT call `kapruka_list_delivery_cities` or `kapruka_check_delivery` during the checkout flow unless the user explicitly asks about shipping costs. If the user provides a city, ACCEPT IT AS THE CANONICAL NAME and IMMEDIATELY call `kapruka_create_order`! Never loop asking for cities if an address is provided.\n\n" .
                     "Once all data points are gathered, run the `kapruka_create_order` tool. Keep your confirmation response brief and warm; let the frontend UI handle rendering the checkout button from the raw JSON payload. Do not expose raw URLs in your text.\n\n" .
 
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
