@@ -300,12 +300,25 @@ export default function ChatApp() {
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [showCartPanel, setShowCartPanel] = useState(false);
 
+    const handleProductClick = (product: any) => {
+        setActiveProduct(product);
+        setShowCartPanel(false);
+    };
+
+    const handleToggleCart = () => {
+        setShowCartPanel(prev => {
+            if (!prev) setActiveProduct(null);
+            return !prev;
+        });
+    };
+
     const addToCart = (product: any) => {
         setCart(prev => {
             const exists = prev.find(p => p.id === product.id);
             if (exists) return prev.map(p => p.id === product.id ? { ...p, qty: p.qty + 1 } : p);
             return [...prev, { ...product, qty: 1 }];
         });
+        setActiveProduct(null);
         setShowCartPanel(true);
     };
 
@@ -382,8 +395,8 @@ export default function ChatApp() {
             .slice(-20);
 
         try {
-            const isDev = import.meta.env.DEV;
-            const apiUrl = isDev ? '/api-proxy/chat/message' : 'http://127.0.0.1:8002/chat/message';
+            const isDev = import.meta.env.MODE === 'development';
+            const apiUrl = isDev ? '/api-proxy/chat/message' : (import.meta.env.VITE_API_URL + '/chat/message');
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -745,7 +758,7 @@ export default function ChatApp() {
                         </div>
 
                         <button 
-                            onClick={() => setShowCartPanel(!showCartPanel)}
+                            onClick={handleToggleCart}
                             className={`relative flex items-center justify-center p-2 rounded-lg transition-all duration-200 cursor-pointer ${
                             darkMode
                                 ? 'bg-white/5 text-dark-muted hover:bg-white/10 hover:text-dark-text border border-dark-border'
@@ -787,7 +800,7 @@ export default function ChatApp() {
                                 <span className="pointer-events-none flex"><EditIcon /></span>
                             </button>
                             <button 
-                                onClick={() => setShowCartPanel(!showCartPanel)}
+                                onClick={handleToggleCart}
                                 className="relative text-white/80 p-2 flex items-center justify-center cursor-pointer"
                             >
                                 <CartIcon />
@@ -1279,7 +1292,7 @@ export default function ChatApp() {
                                                     >
                                                         {/* Image Area */}
                                                         <div 
-                                                            onClick={() => setActiveProduct(product)}
+                                                            onClick={() => handleProductClick(product)}
                                                             className={`relative h-44 overflow-hidden flex items-center justify-center cursor-pointer ${
                                                                 darkMode ? 'bg-dark-bg' : 'bg-gradient-to-br from-gray-50 to-gray-100'
                                                             }`}
@@ -1309,7 +1322,7 @@ export default function ChatApp() {
                                                         <div className="p-4 flex flex-col flex-1">
                                                             {/* Name */}
                                                             <h4 
-                                                                onClick={() => setActiveProduct(product)}
+                                                                onClick={() => handleProductClick(product)}
                                                                 className={`font-bold text-[13px] leading-snug line-clamp-2 flex-1 mb-2 cursor-pointer transition-colors ${
                                                                     darkMode ? 'text-dark-text hover:text-brand-purple-accent' : 'text-gray-900 hover:text-brand-purple'
                                                                 }`}
@@ -1327,7 +1340,7 @@ export default function ChatApp() {
                                                                     <p className={`text-[9px] font-semibold uppercase tracking-wide ${
                                                                         darkMode ? 'text-dark-muted' : 'text-gray-400'
                                                                     }`}>Price</p>
-                                                                    <p className="text-base font-black text-brand-purple">
+                                                                    <p className={`text-base font-black ${darkMode ? 'text-brand-purple-accent' : 'text-brand-purple'}`}>
                                                                         {product.price?.currency || 'LKR'} {(product.price?.amount || product.price)?.toLocaleString?.() ?? (product.price?.amount || product.price)}
                                                                     </p>
                                                                 </div>
@@ -1336,10 +1349,10 @@ export default function ChatApp() {
                                                             {/* CTA Button */}
                                                             <div>
                                                                 {cart.find(p => p.id === product.id) ? (
-                                                                    <div className="flex items-center justify-between bg-brand-purple/10 rounded-xl p-1 border border-brand-purple/20">
-                                                                        <button onClick={() => removeFromCart(product.id)} className="w-8 h-8 flex items-center justify-center text-brand-purple font-bold text-lg hover:bg-brand-purple/20 rounded-lg transition-colors">-</button>
-                                                                        <span className="font-bold text-brand-purple text-[13px]">In Cart ({cart.find(p => p.id === product.id)?.qty})</span>
-                                                                        <button onClick={() => addToCart(product)} className="w-8 h-8 flex items-center justify-center text-brand-purple font-bold text-lg hover:bg-brand-purple/20 rounded-lg transition-colors">+</button>
+                                                                    <div className={`flex items-center justify-between rounded-xl p-1 border ${darkMode ? 'bg-brand-purple-accent/10 border-brand-purple-accent/20' : 'bg-brand-purple/10 border-brand-purple/20'}`}>
+                                                                        <button onClick={() => removeFromCart(product.id)} className={`w-8 h-8 flex items-center justify-center font-bold text-lg rounded-lg transition-colors ${darkMode ? 'text-brand-purple-accent hover:bg-brand-purple-accent/20' : 'text-brand-purple hover:bg-brand-purple/20'}`}>-</button>
+                                                                        <span className={`font-bold text-[13px] ${darkMode ? 'text-brand-purple-accent' : 'text-brand-purple'}`}>In Cart ({cart.find(p => p.id === product.id)?.qty})</span>
+                                                                        <button onClick={() => addToCart(product)} className={`w-8 h-8 flex items-center justify-center font-bold text-lg rounded-lg transition-colors ${darkMode ? 'text-brand-purple-accent hover:bg-brand-purple-accent/20' : 'text-brand-purple hover:bg-brand-purple/20'}`}>+</button>
                                                                     </div>
                                                                 ) : (
                                                                     <button

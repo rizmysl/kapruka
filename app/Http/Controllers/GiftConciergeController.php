@@ -9,7 +9,12 @@ use Illuminate\Support\Facades\Log;
 class GiftConciergeController extends Controller
 {
     // The local Node bridge endpoint running your MCP server
-    private string $nodeBridgeUrl = 'http://localhost:5001/call-tool';
+    private string $nodeBridgeUrl;
+
+    public function __construct()
+    {
+        $this->nodeBridgeUrl = env('NODE_BRIDGE_URL', 'http://localhost:5001/call-tool');
+    }
 
   public function chat(Request $request)
 {

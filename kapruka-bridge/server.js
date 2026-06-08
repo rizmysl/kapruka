@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
@@ -16,8 +17,9 @@ async function connectToKapruka() {
         console.log('Attempting to connect to Kapruka MCP via Streamable HTTP...');
         
         // 2. Initialize the Streamable HTTP transport
+        const mcpUrl = process.env.MCP_SERVER_URL || 'https://mcp.kapruka.com/mcp';
         const transport = new StreamableHTTPClientTransport(
-            new URL('https://mcp.kapruka.com/mcp')
+            new URL(mcpUrl)
         );
         
         mcpClient = new Client(
@@ -55,7 +57,8 @@ app.post('/call-tool', async (req, res) => {
     }
 });
 
-app.listen(5001, async () => {
-    console.log('🚀 Bridge running on http://localhost:5001');
+const PORT = process.env.PORT || 5001;
+app.listen(PORT, async () => {
+    console.log(`🚀 Bridge running on http://localhost:${PORT}`);
     await connectToKapruka();
 });
