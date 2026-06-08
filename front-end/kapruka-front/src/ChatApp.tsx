@@ -1047,7 +1047,7 @@ export default function ChatApp() {
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         transition={{ delay: 0.8, duration: 0.5 }}
-                                        className="mt-8 mb-4 flex flex-col items-center justify-center cursor-pointer group"
+                                        className="hidden md:flex mt-8 mb-4 flex-col items-center justify-center cursor-pointer group"
                                         onClick={() => {
                                             const chatContainer = document.querySelector('.overflow-y-auto.z-10');
                                             if (chatContainer) chatContainer.scrollBy({ top: 450, behavior: 'smooth' });
@@ -1065,7 +1065,7 @@ export default function ChatApp() {
                                         </motion.div>
                                     </motion.div>
                                 {/* Customer-Focused Benefits */}
-                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-4xl text-left">
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="hidden md:grid grid-cols-1 tablet:grid-cols-3 gap-4 w-full max-w-4xl text-left">
                                     {/* Benefit 1 */}
                                     <div className={`p-6 rounded-3xl border transition-all duration-300 ${darkMode ? 'bg-dark-card border-dark-border' : 'bg-white border-gray-100 shadow-sm'}`}>
                                         <span className="text-3xl mb-4 block">🎁</span>
@@ -1087,11 +1087,11 @@ export default function ChatApp() {
                                 </motion.div>
 
                                 {/* Suggested Prompts Grid */}
-                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="w-full max-w-4xl text-left mt-4">
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="hidden md:block w-full max-w-4xl text-left mt-4">
                                     <h3 className={`text-xs font-bold uppercase tracking-widest mb-6 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>
                                         {translations[currentLang].tryPrompts}
                                     </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 tablet:grid-cols-3 lg:grid-cols-4 gap-3">
                                         {[
                                             { t: "Find gifts under Rs. 5,000", i: "🏷️", sub: "Budget Friendly" },
                                             { t: "Gifts from Rs. 5k - 10k", i: "🎁", sub: "Mid-Range" },
@@ -1120,14 +1120,14 @@ export default function ChatApp() {
                                 </motion.div>
 
                                 {/* Local Trust Section */}
-                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="w-full max-w-4xl text-left mt-4">
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="hidden md:block w-full max-w-4xl text-left mt-4">
                                     <div className={`p-6 md:p-8 rounded-3xl border ${
                                         darkMode ? 'bg-dark-card/40 border-dark-border/80' : 'bg-white border-gray-150 shadow-sm'
                                     }`}>
                                         <h3 className={`text-sm font-bold uppercase tracking-widest mb-6 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>
                                             {translations[currentLang].servingCities}
                                         </h3>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-6">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 laptop:grid-cols-6 gap-3 mb-6">
                                             {['Colombo', 'Kandy', 'Galle', 'Jaffna', 'Negombo', 'Batticaloa'].map((city) => (
                                                 <div 
                                                     key={city}
@@ -1151,7 +1151,7 @@ export default function ChatApp() {
                                 </motion.div>
 
                                 {/* Shop By Occasion */}
-                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="w-full max-w-4xl text-left mt-8">
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="hidden md:block w-full max-w-4xl text-left mt-8">
                                     <h3 className={`text-xs font-bold uppercase tracking-widest mb-6 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>Shop By Occasion</h3>
                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                         {[
@@ -1178,7 +1178,7 @@ export default function ChatApp() {
                                 </motion.div>
 
                                 {/* Popular Products Carousel */}
-                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="w-full max-w-5xl text-left mt-8 overflow-hidden">
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="hidden md:block w-full max-w-5xl text-left mt-8 overflow-hidden">
                                     <div className="flex justify-between items-end mb-6 px-4 md:px-0">
                                         <h3 className={`text-xs font-bold uppercase tracking-widest ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>Popular Gifts This Week</h3>
                                     </div>
@@ -1276,7 +1276,7 @@ export default function ChatApp() {
                                         }
 
                                         return (
-                                            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 laptop:grid-cols-3 xl:grid-cols-4 gap-4">
                                                 {resultsArray.map((product: any) => (
                                                     <motion.div
                                                         key={product.id}
@@ -1837,10 +1837,10 @@ export default function ChatApp() {
                         animate={{ x: 0, opacity: 1 }}
                         exit={{ x: 400, opacity: 0 }}
                         transition={{ type: "spring", stiffness: 280, damping: 28 }}
-                        className={`w-80 lg:w-[400px] flex flex-col z-30 h-full transition-colors duration-300 ${
+                        className={`absolute right-0 top-0 bottom-0 lg:relative w-full sm:w-[320px] laptop:w-[400px] flex flex-col z-40 h-full transition-colors duration-300 shadow-2xl lg:shadow-none ${
                             darkMode
                                 ? 'bg-dark-surface/95 backdrop-blur-xl border-l border-dark-border'
-                                : 'bg-white/95 backdrop-blur-xl border-l border-[#002F6C]/10 shadow-2xl'
+                                : 'bg-white/95 backdrop-blur-xl border-l border-[#002F6C]/10'
                         }`}
                     >
                         {/* Header */}
@@ -2502,10 +2502,10 @@ export default function ChatApp() {
                         animate={{ x: 0, opacity: 1 }}
                         exit={{ x: 400, opacity: 0 }}
                         transition={{ type: "spring", stiffness: 280, damping: 28 }}
-                        className={`w-80 lg:w-[400px] flex flex-col z-30 h-full transition-colors duration-300 relative ${
+                        className={`absolute right-0 top-0 bottom-0 lg:relative w-full sm:w-[320px] laptop:w-[400px] flex flex-col z-40 h-full transition-colors duration-300 shadow-2xl lg:shadow-none ${
                             darkMode
                                 ? 'bg-dark-surface/95 backdrop-blur-xl border-l border-dark-border'
-                                : 'bg-white/95 backdrop-blur-xl border-l border-[#002F6C]/10 shadow-2xl'
+                                : 'bg-white/95 backdrop-blur-xl border-l border-[#002F6C]/10'
                         }`}
                     >
                         {/* Header */}

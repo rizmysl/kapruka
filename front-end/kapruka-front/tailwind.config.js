@@ -8,6 +8,15 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
+    screens: {
+      'sm': '640px',
+      'md': '768px',
+      'tablet': '976px',
+      'lg': '1024px',
+      'xl': '1280px',
+      'laptop': '1360px',
+      '2xl': '1536px',
+    },
     extend: {
       fontFamily: {
         sans: ['Plus Jakarta Sans', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
