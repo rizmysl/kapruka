@@ -336,28 +336,28 @@ export default function ChatApp() {
 
     const faqs = [
         {
-            q: "What delivery options does Kapruka offer?",
-            a: "We offer island-wide delivery in Sri Lanka. You can schedule delivery for specific dates, including same-day delivery for select items in the Colombo area. Simply ask the AI to 'Check delivery options' for your desired town."
+            q: "Is Ayla just a shopping bot?",
+            a: "Not at all! Ayla is designed to be your personal AI companion. Whether you need gift ideas, are stressed about planning an anniversary, need relationship advice, or just want to chat about your day, she's here to listen without judgment and support you."
         },
         {
-            q: "What languages can I use to chat with the concierge?",
-            a: "Our AI Concierge is fluent in English, Sinhala, and Tamil. You can switch languages at the top of the screen or simply start typing in your preferred language."
+            q: "What languages can I use to chat?",
+            a: "Ayla is fully fluent in English, Sinhala, and Tamil. She also understands 'Singlish' and 'Tanglish'! Just start typing or speaking in whatever language feels most comfortable to you."
         },
         {
-            q: "How do I make a payment securely?",
-            a: "We accept Visa, MasterCard, American Express, and popular local mobile wallets. Once you confirm your order details, the AI will provide a secure payment link that you can complete within the app or in a new tab."
+            q: "Can you deliver on specific dates or same-day?",
+            a: "Yes! We offer island-wide delivery in Sri Lanka. You can schedule gifts for specific dates like birthdays, and we even offer same-day delivery for select items in the Colombo area. Just ask Ayla to 'Check delivery to [City]'."
         },
         {
-            q: "Can I customize cakes or flower arrangements?",
-            a: "Yes, many of our cakes and floral arrangements allow customization, such as adding an icing message. Let the AI know your requirements (e.g., 'Add a Happy Birthday message')."
+            q: "Can I customize gifts through the chat?",
+            a: "Yes! You can ask Ayla to customize cakes with specific icing messages, pick preferred flower colors, or build custom hampers. Just let her know exactly what you have in mind."
         },
         {
-            q: "How do I track an existing order?",
-            a: "You can track your order status in real-time by asking the concierge 'Track order [Your Order Number]' or by clicking the tracking link in your order confirmation email."
+            q: "How do I check my order status?",
+            a: "Just ask Ayla! Type or say 'Track my order [Order Number]' and she will instantly provide you with real-time updates on your delivery."
         },
         {
-            q: "What is your return and refund policy?",
-            a: "We offer a flexible refund policy for damaged or incorrect items. Please contact our support team or inform the concierge within 24 hours of delivery with photos of the item."
+            q: "Is it safe to pay through the chat?",
+            a: "100% safe. Once your cart is ready, Ayla provides a secure checkout link. Your payment is processed through Kapruka's secure bank gateway, accepting Visa, MasterCard, Amex, and local mobile wallets."
         }
     ];
 
