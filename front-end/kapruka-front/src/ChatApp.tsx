@@ -1254,9 +1254,12 @@ export default function ChatApp() {
                                                         }`}
                                                     >
                                                         {/* Image Area */}
-                                                        <div className={`relative h-44 overflow-hidden flex items-center justify-center ${
-                                                            darkMode ? 'bg-dark-bg' : 'bg-gradient-to-br from-gray-50 to-gray-100'
-                                                        }`}>
+                                                        <div 
+                                                            onClick={() => setActiveProduct(product)}
+                                                            className={`relative h-44 overflow-hidden flex items-center justify-center cursor-pointer ${
+                                                                darkMode ? 'bg-dark-bg' : 'bg-gradient-to-br from-gray-50 to-gray-100'
+                                                            }`}
+                                                        >
                                                             <ImageWithFallback 
                                                                 src={product.image_url} 
                                                                 alt={product.name}
@@ -1268,8 +1271,6 @@ export default function ChatApp() {
                                                                     </div>
                                                                 }
                                                             />
-                                                            {/* Gradient overlay at bottom */}
-                                                            <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/20 to-transparent" />
                                                             {/* Stock badge */}
                                                             <span className={`absolute top-3 left-3 text-[9px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wide shadow-sm ${
                                                                 product.in_stock
@@ -1278,30 +1279,26 @@ export default function ChatApp() {
                                                             }`}>
                                                                 {product.in_stock ? '✓ In Stock' : '× Sold Out'}
                                                             </span>
-                                                            {/* Quick inspect overlay */}
-                                                            <button
-                                                                onClick={() => setActiveProduct(product)}
-                                                                className="absolute top-3 right-3 w-8 h-8 rounded-xl bg-white/90 dark:bg-dark-card/90 text-brand-purple dark:text-brand-purple-accent shadow-md flex items-center justify-center hover:bg-brand-purple hover:text-white dark:hover:bg-brand-purple dark:hover:text-white transition-all duration-300 hover:scale-110 cursor-pointer border border-brand-purple/10 dark:border-dark-border"
-                                                                title="Inspect Product"
-                                                            >
-                                                                <EyeIcon />
-                                                            </button>
                                                         </div>
 
                                                         {/* Content */}
                                                         <div className="p-4 flex flex-col flex-1">
-                                                            {/* Product ID */}
-                                                            <p className={`text-[9px] font-mono font-bold uppercase tracking-widest mb-1 ${
-                                                                darkMode ? 'text-dark-muted' : 'text-gray-400'
-                                                            }`}>{product.id}</p>
-
                                                             {/* Name */}
-                                                            <h4 className={`font-bold text-[13px] leading-snug line-clamp-2 flex-1 mb-3 ${
-                                                                darkMode ? 'text-dark-text' : 'text-gray-900'
-                                                            }`}>{product.name}</h4>
+                                                            <h4 
+                                                                onClick={() => setActiveProduct(product)}
+                                                                className={`font-bold text-[13px] leading-snug line-clamp-2 flex-1 mb-2 cursor-pointer transition-colors ${
+                                                                    darkMode ? 'text-dark-text hover:text-brand-purple-accent' : 'text-gray-900 hover:text-brand-purple'
+                                                                }`}
+                                                            >
+                                                                {product.name}
+                                                            </h4>
+
+                                                            <p className={`text-[10px] font-medium mb-3 ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
+                                                                🚚 Same-day delivery available
+                                                            </p>
 
                                                             {/* Price row */}
-                                                            <div className="flex items-center justify-between mb-3">
+                                                            <div className="flex items-center justify-between mb-4">
                                                                 <div>
                                                                     <p className={`text-[9px] font-semibold uppercase tracking-wide ${
                                                                         darkMode ? 'text-dark-muted' : 'text-gray-400'
@@ -1310,49 +1307,25 @@ export default function ChatApp() {
                                                                         {product.price?.currency || 'LKR'} {(product.price?.amount || product.price)?.toLocaleString?.() ?? (product.price?.amount || product.price)}
                                                                     </p>
                                                                 </div>
-                                                                {cart.find(p => p.id === product.id) && (
-                                                                    <span className="text-[9px] px-2 py-1 bg-brand-purple/10 text-brand-purple font-bold rounded-full border border-brand-purple/20">
-                                                                        🛒 ×{cart.find(p => p.id === product.id)?.qty}
-                                                                    </span>
-                                                                )}
                                                             </div>
 
-                                                            {/* 3 Action Buttons */}
-                                                            <div className="grid grid-cols-3 gap-1.5">
-                                                                {/* Delivery */}
-                                                                <button
-                                                                    onClick={() => sendMessage(`Check delivery availability for product ${product.id}`)}
-                                                                    className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl text-[9px] font-bold transition-all duration-200 ${
-                                                                        darkMode
-                                                                            ? 'bg-white/5 text-dark-muted hover:bg-emerald-900/30 hover:text-emerald-400 border border-dark-border hover:border-emerald-800'
-                                                                            : 'bg-gray-50 text-gray-500 hover:bg-emerald-50 hover:text-emerald-700 border border-gray-100 hover:border-emerald-200'
-                                                                    }`}
-                                                                >
-                                                                    <span className="text-base">🚚</span>
-                                                                    Delivery
-                                                                </button>
-                                                                {/* Add to Cart */}
-                                                                <button
-                                                                    onClick={() => addToCart(product)}
-                                                                    disabled={!product.in_stock}
-                                                                    className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl text-[9px] font-bold transition-all duration-200 disabled:opacity-40 ${
-                                                                        darkMode
-                                                                            ? 'bg-white/5 text-dark-muted hover:bg-brand-purple/20 hover:text-brand-purple border border-dark-border hover:border-brand-purple/30'
-                                                                            : 'bg-gray-50 text-gray-500 hover:bg-brand-purple/10 hover:text-brand-purple border border-gray-100 hover:border-brand-purple/20'
-                                                                    }`}
-                                                                >
-                                                                    <span className="text-base">🛒</span>
-                                                                    Cart
-                                                                </button>
-                                                                {/* Buy Now */}
-                                                                <button
-                                                                    onClick={() => sendMessage(`I would like to checkout and order product ${product.id} (${product.name}). Please help me complete the purchase.`)}
-                                                                    disabled={!product.in_stock}
-                                                                    className="flex flex-col items-center gap-1 py-2 px-1 rounded-xl text-[9px] font-bold transition-all duration-200 disabled:opacity-40 bg-gradient-to-br from-brand-purple to-brand-purple-dark text-white hover:shadow-lg hover:shadow-brand-purple/30 hover:opacity-90"
-                                                                >
-                                                                    <span className="text-base">🛍️</span>
-                                                                    Buy
-                                                                </button>
+                                                            {/* CTA Button */}
+                                                            <div>
+                                                                {cart.find(p => p.id === product.id) ? (
+                                                                    <div className="flex items-center justify-between bg-brand-purple/10 rounded-xl p-1 border border-brand-purple/20">
+                                                                        <button onClick={() => removeFromCart(product.id)} className="w-8 h-8 flex items-center justify-center text-brand-purple font-bold text-lg hover:bg-brand-purple/20 rounded-lg transition-colors">-</button>
+                                                                        <span className="font-bold text-brand-purple text-[13px]">In Cart ({cart.find(p => p.id === product.id)?.qty})</span>
+                                                                        <button onClick={() => addToCart(product)} className="w-8 h-8 flex items-center justify-center text-brand-purple font-bold text-lg hover:bg-brand-purple/20 rounded-lg transition-colors">+</button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => addToCart(product)}
+                                                                        disabled={!product.in_stock}
+                                                                        className="w-full py-2.5 rounded-xl text-[13px] font-bold transition-all duration-200 disabled:opacity-40 bg-gradient-to-br from-brand-purple to-brand-purple-dark text-white hover:shadow-lg hover:shadow-brand-purple/30 hover:opacity-90"
+                                                                    >
+                                                                        Add to Cart
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </motion.div>
