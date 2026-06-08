@@ -172,22 +172,38 @@ export default function ChatApp() {
         if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
             const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
             recognitionRef.current = new SpeechRecognition();
-            recognitionRef.current.continuous = false;
+            recognitionRef.current.continuous = true;
             recognitionRef.current.interimResults = false;
             
-            recognitionRef.current.onstart = () => setIsRecording(true);
+            let silenceTimer: any = null;
+            let accumulatedTranscript = '';
+
+            recognitionRef.current.onstart = () => {
+                setIsRecording(true);
+                accumulatedTranscript = '';
+            };
             
             recognitionRef.current.onresult = (event: any) => {
-                let newTranscript = '';
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
                     if (event.results[i].isFinal) {
-                        newTranscript += event.results[i][0].transcript;
+                        accumulatedTranscript += event.results[i][0].transcript + ' ';
                     }
                 }
-                const finalStr = newTranscript.trim();
-                if (finalStr && sendMessageRef.current) {
-                    sendMessageRef.current(finalStr);
-                }
+                
+                // Clear previous timer and set a new one for 2.5 seconds (increased pause delay)
+                if (silenceTimer) clearTimeout(silenceTimer);
+                
+                silenceTimer = setTimeout(() => {
+                    const finalStr = accumulatedTranscript.trim();
+                    if (finalStr && sendMessageRef.current) {
+                        sendMessageRef.current(finalStr);
+                        accumulatedTranscript = '';
+                        // Auto stop recognition after sending
+                        if (recognitionRef.current) {
+                            recognitionRef.current.stop();
+                        }
+                    }
+                }, 2500);
             };
             
             recognitionRef.current.onerror = (event: any) => {
@@ -195,7 +211,10 @@ export default function ChatApp() {
                 setIsRecording(false);
             };
             
-            recognitionRef.current.onend = () => setIsRecording(false);
+            recognitionRef.current.onend = () => {
+                setIsRecording(false);
+                if (silenceTimer) clearTimeout(silenceTimer);
+            };
         }
     }, []);
 
@@ -970,6 +989,11 @@ export default function ChatApp() {
                                         </h2>
                                         <p className={`text-sm md:text-base lg:text-lg max-w-2xl leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>
                                             {translations[currentLang].heroDesc}
+                                        </p>
+
+                                        {/* Playful Capability Text */}
+                                        <p className={`italic font-medium text-sm md:text-base ${darkMode ? 'text-brand-purple-accent/90' : 'text-brand-purple/90'}`}>
+                                            {translations[currentLang].tryMeText}
                                         </p>
 
                                         {/* Language Support Indicator Trust Badge */}
