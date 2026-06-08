@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 
@@ -37,67 +37,7 @@ interface ChatSession {
 
 const shoppingPattern = `url('data:image/svg+xml;utf8,<svg width="150" height="150" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 20 30 h 20 v 20 h -20 z"/><path d="M 30 30 v 20"/><path d="M 20 40 h 20"/><path d="M 30 30 c -4 -6 -10 -2 -5 2 c 5 4 5 -2 5 -2"/><path d="M 30 30 c 4 -6 10 -2 5 2 c -5 4 -5 -2 -5 -2"/><path d="M 100 25 c -3 -3 -8 -3 -11 0 c -2 2 -3 5 -2 8 c 2 6 13 15 13 15 s 11 -9 13 -15 c 1 -3 0 -6 -2 -8 c -3 -3 -8 -3 -11 0 z" fill="black"/><path d="M 25 100 h 16 l 2 20 h -20 z"/><path d="M 29 100 a 4 4 0 0 1 8 0"/><path d="M 105 110 c -5 -5 0 -12 5 -7 c 5 -5 12 0 7 5 c 5 5 0 12 -5 7 c -5 5 -12 0 -7 -5 z"/><circle cx="110" cy="115" r="2" fill="black"/><path d="M 60 20 l 2 6 l 6 2 l -6 2 l -2 6 l -2 -6 l -6 -2 l 6 -2 z" fill="black" stroke="none"/><path d="M 55 80 l 10 0 l -2 10 l -6 0 z"/><path d="M 53 80 c 0 -8 14 -8 14 0" fill="black"/><circle cx="60" cy="70" r="1.5" fill="black" stroke="none"/><path d="M 125 65 c -5 -5 -10 5 0 5 c 10 -5 5 -15 0 -5 z"/><path d="M 80 120 c 5 -10 15 -10 10 0 c -2 5 -8 5 -10 0 z"/><path d="M 85 122 v 10"/><path d="M 130 90 c -2 0 -4 -2 -4 -4 v -10 c 0 -2 2 -4 4 -4 h 10 c 2 0 4 2 4 4 v 10 c 0 2 -2 4 -4 4 z"/><path d="M 135 80 l -5 10"/><path d="M 40 130 c -2 -2 -5 -2 -7 0 c -2 2 -2 5 0 7 c 2 2 5 2 7 0 c 2 -2 2 -5 0 -7 z"/><path d="M 15 65 h 5 v 5 h -5 z" fill="black"/></svg>')`;
 
-
-const translations = {
-    en: {
-        heroTitle: "Meet Ayla, your Personal AI Shopping Concierge",
-        heroSub: "ආයුබෝවන් • வணக்கம் • Welcome",
-        heroDesc: "Find gifts, flowers, cakes, electronics, and essentials with AI-powered assistance and island-wide delivery.",
-        welcomeTitle: "ආයුබෝවන් 👋 | வணக்கம் 👋",
-        welcomeSub: "I'm Ayla, your personal shopping concierge.",
-        welcomeTellMe: "Tell me:",
-        welcomeOccasion: "What occasion is it?",
-        welcomeBudget: "What's your budget?",
-        welcomeDelivery: "Where should it be delivered?",
-        welcomeFooter: "I'll find the perfect gift instantly.",
-        trustIndicator: "Chat in English, සිංහල, or தமிழ்",
-        trustIndicatorSub: "Type naturally. Mix languages, use Singlish or Tanglish—our AI understands exactly what you mean.",
-        servingCities: "Serving customers across Sri Lanka",
-        sameDayBanner: "Same-Day Delivery Available in Selected Areas",
-        tryPrompts: "Try these prompts",
-        shopOccasion: "Shop By Occasion",
-        inputPlaceholder: "What gift are you looking for today?",
-    },
-    si: {
-        heroTitle: "ඔබේ පෞද්ගලික AI සාප්පු සවාරි සහායකයා වන Ayla හමුවන්න",
-        heroSub: "ආයුබෝවන් • வணக்கம் • Welcome",
-        heroDesc: "මල්, කේක්, තෑගි, ඉලෙක්ට්‍රොනික උපකරණ සහ අනෙකුත් දෑ AI සහාය ඇතිව දිවයින පුරා බෙදාහැරීමේ සේවාව සමගින් සොයාගන්න.",
-        welcomeTitle: "ආයුබෝවන් 👋 | வணக்கம் 👋",
-        welcomeSub: "මම Ayla, ඔබේ පෞද්ගලික සාප්පු සවාරි සහායකයා.",
-        welcomeTellMe: "මට පවසන්න:",
-        welcomeOccasion: "උත්සවය කුමක්ද?",
-        welcomeBudget: "ඔබේ අයවැය කොපමණද?",
-        welcomeDelivery: "එය භාර දිය යුත්තේ කොහේද?",
-        welcomeFooter: "මම ඔබට කදිම තෑග්ගක් සැනෙකින් සොයා දෙන්නෙමි.",
-        trustIndicator: "English • සිංහල • தமிழ் සහාය ඇත",
-        trustIndicatorSub: "පාරිභෝගිකයින්ට ඉංග්‍රීසි, සිංහල හෝ දෙමළ භාෂාවෙන් සුමටව සංවාදයේ යෙදිය හැකිය.",
-        servingCities: "ශ්‍රී ලංකාව පුරා සිටින පාරිභෝගිකයින්ට සේවා සපයනු ලැබේ",
-        sameDayBanner: "තෝරාගත් ප්‍රදේශ කිහිපයක එදිනම බෙදා හැරීම සිදු කළ හැකිය",
-        tryPrompts: "මෙම විමසුම් උත්සාහ කරන්න",
-        shopOccasion: "විශේෂ උත්සව අනුව තෝරන්න",
-        inputPlaceholder: "අද ඔබ සොයන්නේ කුමන ආකාරයේ තෑග්ගක්ද?",
-    },
-    ta: {
-        heroTitle: "உங்கள் தனிப்பட்ட AI ஷாப்பிங் உதவியாளர் Ayla ஐ சந்தியுங்கள்",
-        heroSub: "வணக்கம் • Welcome • ஆயுபோவன்",
-        heroDesc: "பூக்கள், கேக்குகள், பரிசுகள், மின்னணு பொருட்கள் மற்றும் பிறவற்றை AI உதவியுடன் நாடு தழுவிய விநியோகத்துடன் கண்டறியுங்கள்.",
-        welcomeTitle: "ආයුබෝවන් 👋 | வணக்கம் 👋",
-        welcomeSub: "நான் Ayla, உங்கள் தனிப்பட்ட ஷாப்பிங் உதவியாளர்.",
-        welcomeTellMe: "எனக்குச் சொல்லுங்கள்:",
-        welcomeOccasion: "என்ன சந்தர்ப்பம்?",
-        welcomeBudget: "உங்கள் வரவுசெலவுத் திட்டம் என்ன?",
-        welcomeDelivery: "எங்கு விநியோகிக்கப்பட வேண்டும்?",
-        welcomeFooter: "நான் சிறந்த பரிசை உடனடியாகக் கண்டுபிடிப்பேன்.",
-        trustIndicator: "English • සිංහල • தமிழ் ஆதரவு கிடைக்கிறது",
-        trustIndicatorSub: "வாடிக்கையாளர்கள் ஆங்கிலம், சிங்களம் அல்லது தமிழில் இயல்பாக அரட்டையடிக்கலாம்.",
-        servingCities: "இலங்கை முழுவதும் உள்ள வாடிக்கையாளர்களுக்கு சேவை வழங்கப்படுகிறது",
-        sameDayBanner: "தேர்ந்தெடுக்கப்பட்ட பகுதிகளில் ஒரே நாளில் டெலிவரி கிடைக்கும்",
-        tryPrompts: "இந்த தூண்டல்களை முயற்சிக்கவும்",
-        shopOccasion: "சந்தர்ப்பம் மூலம் ஷாப்பிங் செய்யுங்கள்",
-        inputPlaceholder: "இன்று நீங்கள் எந்த பரிசைத் தேடுகிறீர்கள்?",
-    }
-};
-
+import { translations } from './translations';
 const getInitialWelcomeMsg = (): Message => ({ 
     role: 'bot', 
     text: `${getDynamicGreeting()} I'm your Colombo Gift Concierge — powered by AI. Tell me who you're shopping for, and I'll find the perfect gift!` 
@@ -979,8 +919,20 @@ export default function ChatApp() {
                         </div>
                     </div>
                 ) : (
-                <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-6 relative z-10">
-                    <AnimatePresence>
+                <>
+                    {messages.length === 1 && (
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.5 }}
+                            className="fixed right-[-10%] md:right-[-15%] lg:right-[-12%] 2xl:right-[-10%] top-[10%] md:top-[15%] w-72 h-72 md:w-[500px] md:h-[500px] lg:w-[700px] lg:h-[950px] 2xl:w-[850px] 2xl:h-[950px] opacity-100 dark:opacity-100 pointer-events-none z-10 blur-[0.5px] drop-shadow-2xl"
+                        >
+                            <img src="/ayla_3d_avatar.png" alt="Ayla AI" className="w-full h-full object-contain relative z-10" />
+                        </motion.div>
+                    )}
+                    <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 md:p-10 space-y-6 relative z-10">
+                        <AnimatePresence>
                         {messages.length === 1 ? (
                             <motion.div
                                 key="empty-state"
@@ -997,46 +949,61 @@ export default function ChatApp() {
                                 className="flex flex-col items-center max-w-5xl mx-auto py-6 text-center gap-10"
                             >
                                  {/* Hero Section */}
-                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="flex flex-col items-center gap-4">
-                                    <p className="text-brand-purple dark:text-brand-purple-accent text-xs font-bold uppercase tracking-[0.25em] bg-brand-purple/10 px-4 py-1.5 rounded-full border border-brand-purple/20">
-                                        {translations[currentLang].heroSub}
-                                    </p>
-                                    <h2 className={`text-4xl sm:text-5xl md:text-7xl font-serif font-black tracking-tighter leading-[0.95] max-w-4xl bg-clip-text text-transparent pb-2 drop-shadow-sm ${darkMode ? 'bg-gradient-to-br from-white via-gray-300 to-gray-500' : 'bg-gradient-to-br from-gray-900 via-gray-700 to-gray-500'}`}>
-                                        {translations[currentLang].heroTitle}
-                                    </h2>
-                                    <p className={`text-sm md:text-base max-w-2xl leading-relaxed px-4 ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>
-                                        {translations[currentLang].heroDesc}
-                                    </p>
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="relative flex flex-col items-center gap-6 w-full max-w-5xl px-4 py-8">
+                                    
+                                    {/* Center: Text & Actions */}
+                                    <div className="flex flex-col items-center text-center gap-5 z-10">
+                                        <p className="text-brand-purple dark:text-brand-purple-accent text-xs font-bold uppercase tracking-[0.25em] bg-brand-purple/10 px-4 py-1.5 rounded-full border border-brand-purple/20 backdrop-blur-md">
+                                            {translations[currentLang].heroSub}
+                                        </p>
+                                        <h2 className={`text-4xl sm:text-5xl md:text-7xl font-serif font-black tracking-tighter leading-[1] max-w-4xl bg-clip-text text-transparent pb-2 drop-shadow-sm ${darkMode ? 'bg-gradient-to-br from-white via-gray-300 to-gray-500' : 'bg-gradient-to-br from-gray-900 via-gray-700 to-gray-500'}`}>
+                                            {translations[currentLang].heroTitle.split('Ayla').map((part, i, arr) => (
+                                                <Fragment key={i}>
+                                                    {part}
+                                                    {i < arr.length - 1 && (
+                                                        <span className={`font-script font-normal tracking-normal pb-2 inline-block -mb-4 drop-shadow-md px-2 ${darkMode ? 'text-pink-400 drop-shadow-[0_0_15px_rgba(244,114,182,0.6)]' : 'text-brand-purple-accent'}`}>
+                                                            Ayla
+                                                        </span>
+                                                    )}
+                                                </Fragment>
+                                            ))}
+                                        </h2>
+                                        <p className={`text-sm md:text-base lg:text-lg max-w-2xl leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>
+                                            {translations[currentLang].heroDesc}
+                                        </p>
 
-                                    {/* Language Support Indicator Trust Badge */}
-                                    <div className={`mt-2 flex flex-col items-center gap-1.5 px-4 md:px-6 py-3 rounded-2xl border mx-4 md:mx-0 ${
-                                        darkMode ? 'bg-dark-card/30 border-dark-border/60' : 'bg-brand-purple/5 border-brand-purple/10'
-                                    }`}>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm">🇱🇰</span>
-                                            <span className={`text-xs font-bold tracking-wider text-center ${darkMode ? 'text-brand-purple-accent' : 'text-brand-purple'}`}>
-                                                {translations[currentLang].trustIndicator}
+                                        {/* Language Support Indicator Trust Badge */}
+                                        <div className={`mt-2 flex flex-col items-center gap-1.5 px-6 py-3 rounded-2xl border backdrop-blur-md ${
+                                            darkMode ? 'bg-dark-card/60 border-dark-border/60' : 'bg-brand-purple/5 border-brand-purple/10'
+                                        }`}>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm">🇱🇰</span>
+                                                <span className={`text-xs font-bold tracking-wider ${darkMode ? 'text-brand-purple-accent' : 'text-brand-purple'}`}>
+                                                    {translations[currentLang].trustIndicator}
+                                                </span>
+                                            </div>
+                                            <span className={`text-[10px] ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
+                                                {translations[currentLang].trustIndicatorSub}
                                             </span>
                                         </div>
-                                        <span className={`text-[10px] text-center ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
-                                            {translations[currentLang].trustIndicatorSub}
-                                        </span>
-                                    </div>
-                                    
-                                    {/* Trust Indicators */}
-                                    <div className={`flex flex-col sm:flex-row flex-wrap justify-center items-center gap-2 sm:gap-6 mt-4 text-[11px] font-semibold tracking-wider ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-[10px] opacity-70">⭐</span> <span>RATED BY CUSTOMERS</span>
-                                        </div>
-                                        <div className={`hidden sm:block w-1 h-1 rounded-full ${darkMode ? 'bg-dark-border' : 'bg-gray-300'}`}></div>
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-[10px] opacity-70">🚚</span> <span>SAME-DAY DELIVERY</span>
-                                        </div>
-                                        <div className={`hidden sm:block w-1 h-1 rounded-full ${darkMode ? 'bg-dark-border' : 'bg-gray-300'}`}></div>
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-[10px] opacity-70">🎁</span> <span>5,000+ DELIVERED</span>
+                                        
+                                        {/* Trust Indicators */}
+                                        <div className={`flex flex-col sm:flex-row flex-wrap justify-center items-center gap-3 sm:gap-6 mt-4 text-[11px] font-semibold tracking-wider ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-[10px] opacity-70">⭐</span> <span>RATED BY CUSTOMERS</span>
+                                            </div>
+                                            <div className={`w-1 h-1 rounded-full hidden sm:block ${darkMode ? 'bg-dark-border' : 'bg-gray-300'}`}></div>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-[10px] opacity-70">🚚</span> <span>SAME-DAY DELIVERY</span>
+                                            </div>
+                                            <div className={`w-1 h-1 rounded-full hidden sm:block ${darkMode ? 'bg-dark-border' : 'bg-gray-300'}`}></div>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-[10px] opacity-70">🎁</span> <span>5,000+ DELIVERED</span>
+                                            </div>
                                         </div>
                                     </div>
+
+                                </motion.div>
 
                                     {/* Scroll Down Indicator */}
                                     <motion.div 
@@ -1060,8 +1027,6 @@ export default function ChatApp() {
                                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                                         </motion.div>
                                     </motion.div>
-                                </motion.div>
-
                                 {/* Customer-Focused Benefits */}
                                 <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-4xl text-left">
                                     {/* Benefit 1 */}
@@ -1797,16 +1762,17 @@ export default function ChatApp() {
                                 darkMode ? 'glass' : 'glass-strong'
                             }`}>
                                 <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.2 }}
-                                    className="w-2.5 h-2.5 bg-gradient-to-r from-brand-purple to-brand-purple-dark rounded-full" />
+                                    className="w-2.5 h-2.5 bg-gradient-to-r from-pink-400 to-pink-600 rounded-full" />
                                 <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.2 }}
-                                    className="w-2.5 h-2.5 bg-gradient-to-r from-brand-purple to-brand-purple-dark rounded-full" />
+                                    className="w-2.5 h-2.5 bg-gradient-to-r from-pink-400 to-pink-600 rounded-full" />
                                 <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.4 }}
-                                    className="w-2.5 h-2.5 bg-gradient-to-r from-brand-purple to-brand-purple-dark rounded-full" />
+                                    className="w-2.5 h-2.5 bg-gradient-to-r from-pink-400 to-pink-600 rounded-full" />
                             </div>
                         </div>
                     )}
                     <div ref={messagesEndRef} />
                 </div>
+                </>
                 )}
 
                 {/* ── Input Area ── */}
