@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  ayla-bridge:
+    build:
+      context: ./kapruka-bridge
+      dockerfile: Dockerfile
+    container_name: kapruka-ayla-bridge
+    ports:
+      - "127.0.0.1:3001:5001"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+
+  ayla-front:
+    build:
+      context: ./front-end/kapruka-front
+      dockerfile: Dockerfile
+      args:
+        # Since the browser accesses the API via the host proxy,
+        # we will route API requests through a subdomain or a specific path.
+        - VITE_API_URL=http://ayla-api.winstercloud.com
+    container_name: kapruka-ayla-front
+    ports:
+      - "127.0.0.1:8081:80" # Shifted to 8081 to avoid conflict with dispatch
+    depends_on:
+      - ayla-bridge
+    restart: unless-stopped
+
+  kapruka-backend:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: kapruka-backend
+    volumes:
+      - ./:/var/www
+    restart: unless-stopped
+
+  kapruka-nginx:
+    image: nginx:alpine
+    container_name: kapruka-nginx
+    ports:
+      - "127.0.0.1:8002:80" # Shifted to 8002 to keep it safe and internal
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - kapruka-backend
+    restart: unless-stopped

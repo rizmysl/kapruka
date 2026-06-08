@@ -7,7 +7,7 @@ import { ImageWithFallback } from './components/common/ImageWithFallback';
 import {
   SendIcon, SunIcon, MoonIcon, EditIcon, ChatIcon, HelpIcon, HistoryIcon, CategoriesIcon,
   CartIcon, TrashIcon, SidebarIcon, FallbackImageIcon,
-  AttachmentIcon, MicrophoneIcon, EyeIcon
+  AttachmentIcon, MicrophoneIcon
 } from './components/icons';
 
 interface RawData {
@@ -297,7 +297,7 @@ export default function ChatApp() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [cart, setCart] = useState<any[]>([]);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
     const [showCartPanel, setShowCartPanel] = useState(false);
 
     const handleProductClick = (product: any) => {
@@ -790,13 +790,13 @@ export default function ChatApp() {
                 }`}>
                     <div className="flex justify-between items-center w-full">
                         <div className="flex items-center gap-1.5 z-30">
-                            <button onClick={() => setMobileSidebarOpen(true)} className={`relative z-30 p-2 cursor-pointer flex items-center justify-center rounded-lg transition-colors ${darkMode ? 'text-white hover:bg-white/10' : 'text-white/80 hover:bg-white/20'}`}>
+                            <button className={`relative z-30 p-2 cursor-pointer flex items-center justify-center rounded-lg transition-colors ${darkMode ? 'text-white hover:bg-white/10' : 'text-white/80 hover:bg-white/20'}`}>
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                             </button>
                             <h1 className="text-base font-bold text-white whitespace-nowrap">Ayla</h1>
                         </div>
                         <div className="flex items-center gap-1 z-30">
-                            <button onClick={() => { setMobileSidebarOpen(false); startNewChat(); }} className={`relative z-30 p-2 cursor-pointer flex items-center justify-center rounded-lg transition-colors ${darkMode ? 'text-brand-purple-accent hover:bg-brand-purple/20' : 'text-white/80 hover:bg-white/20'}`}>
+                            <button onClick={() => { startNewChat(); }} className={`relative z-30 p-2 cursor-pointer flex items-center justify-center rounded-lg transition-colors ${darkMode ? 'text-brand-purple-accent hover:bg-brand-purple/20' : 'text-white/80 hover:bg-white/20'}`}>
                                 <span className="pointer-events-none flex"><EditIcon /></span>
                             </button>
                             <button 
