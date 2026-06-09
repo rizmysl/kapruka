@@ -19,7 +19,7 @@ services:
       args:
         # Since the browser accesses the API via the host proxy,
         # we will route API requests through a subdomain or a specific path.
-        - VITE_API_URL=http://ayla-api.winstercloud.com
+        - VITE_API_URL=https://ayla-api.winstercloud.com
     container_name: kapruka-ayla-front
     ports:
       - "127.0.0.1:8081:80" # Shifted to 8081 to avoid conflict with dispatch
@@ -32,6 +32,8 @@ services:
       context: .
       dockerfile: docker/php/Dockerfile
     container_name: kapruka-backend
+    environment:
+      - NODE_BRIDGE_URL=http://ayla-bridge:5001/call-tool
     volumes:
       - ./:/var/www
     restart: unless-stopped

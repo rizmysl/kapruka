@@ -13,7 +13,6 @@ rsync -avzP \
     --exclude 'front-end/kapruka-front/node_modules' \
     --exclude 'front-end/kapruka-front/dist' \
     --exclude 'kapruka-bridge/node_modules' \
-    --exclude 'vendor' \
     --exclude 'storage/framework' \
     --exclude 'public/hot' \
     --exclude 'bootstrap/cache' \
@@ -33,16 +32,14 @@ ssh $SERVER << EOF
     rm -rf bootstrap/cache/*.php
     rm -f public/hot
 
-    # Give the web user (www-data is usually 33) ownership BEFORE containers start
-    chown -R 33:33 storage bootstrap/cache
-    chmod -R 775 storage bootstrap/cache
+    # Give the web user (www-data is usually 33) ownership of the ENTIRE directory 
+    # so composer can install dependencies and Laravel can write logs.
+    chown -R 33:33 $REMOTE_PATH
+    chmod -R 775 $REMOTE_PATH/storage $REMOTE_PATH/bootstrap/cache
 
     # 2. Rebuild and restart containers
     echo "🐳 Rebuilding and restarting Docker containers..."
-    # Force remove existing containers if there are naming conflicts
-    docker rm -f kapruka-ayla-bridge kapruka-ayla-front kapruka-backend kapruka-nginx || true
-    
-    docker-compose down --remove-orphans
+    docker-compose down
     docker-compose up -d --build
     
     # Wait for backend container to be ready
@@ -57,7 +54,10 @@ ssh $SERVER << EOF
 
     # 3. Install PHP Dependencies and Run Migrations
     echo "📦 Installing PHP dependencies..."
-    docker-compose exec -T -u www-data kapruka-backend composer install --no-dev --optimize-autoloader
+    docker-compose exec -T -e COMPOSER_ALLOW_SUPERUSER=1 kapruka-backend composer install --no-dev --optimize-autoloader || echo "⚠️ Composer install failed!"
+    
+    # Make sure the newly created vendor directory is owned by the web server
+    chown -R 33:33 $REMOTE_PATH/vendor 2>/dev/null || true
 
     # Re-create the storage symlink
     docker-compose exec -T kapruka-backend php artisan storage:link --force
