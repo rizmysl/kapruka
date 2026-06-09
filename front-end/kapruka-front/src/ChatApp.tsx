@@ -104,6 +104,7 @@ export default function ChatApp() {
             setActivePayment(null);
             setShowHelp(false);
             setShowHistory(false);
+            setMobileSidebarOpen(false);
             return;
         }
         const newId = Date.now().toString();
@@ -121,6 +122,7 @@ export default function ChatApp() {
         setActivePayment(null);
         setShowHelp(false);
         setShowHistory(false);
+        setMobileSidebarOpen(false);
     };
 
     const switchSession = (id: string) => {
@@ -129,6 +131,7 @@ export default function ChatApp() {
         setActivePayment(null);
         setShowHelp(false);
         setShowHistory(false);
+        setMobileSidebarOpen(false);
     };
 
     const deleteSession = (e: React.MouseEvent, id: string) => {
@@ -299,6 +302,7 @@ export default function ChatApp() {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
     const [showCartPanel, setShowCartPanel] = useState(false);
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     const handleProductClick = (product: any) => {
         setActiveProduct(product);
@@ -432,18 +436,28 @@ export default function ChatApp() {
     }, [sendMessage]);
 
     return (
-        <div className={`flex h-screen w-full overflow-hidden font-sans transition-colors duration-300 ${darkMode ? 'bg-dark-bg' : 'bg-gradient-to-br from-indigo-50 via-white to-purple-50 animate-mesh'}`}>
+        <div className={`flex h-[100dvh] w-full overflow-hidden font-sans transition-colors duration-300 ${darkMode ? 'bg-dark-bg' : 'bg-gradient-to-br from-indigo-50 via-white to-purple-50 animate-mesh'}`}>
+
+            {/* ═══════════════ MOBILE SIDEBAR BACKDROP ═══════════════ */}
+            {mobileSidebarOpen && (
+                <div
+                    className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm md:hidden"
+                    onClick={() => setMobileSidebarOpen(false)}
+                />
+            )}
 
             {/* ═══════════════ PANE 1: SIDEBAR ═══════════════ */}
-            <div className={`flex flex-col z-20 hidden md:flex transition-all duration-300 ${
-                sidebarCollapsed ? 'w-16 border-r' : 'w-64 border-r'
+            <div className={`flex flex-col z-40 transition-all duration-300 ${
+                sidebarCollapsed ? 'md:w-16 md:border-r' : 'md:w-64 md:border-r'
             } ${
                 darkMode
                     ? 'bg-dark-surface/80 backdrop-blur-xl border-dark-border'
                     : 'bg-gradient-to-b from-[#002F6C] to-[#001845] shadow-2xl border-white/10'
-            }`}>
+            } fixed md:relative inset-y-0 left-0 w-72 md:flex ${
+                mobileSidebarOpen ? 'flex translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
+            } md:!transform-none`}>
                 {/* Logo */}
-                <div className={`p-4 pb-3 flex flex-col items-center justify-between ${sidebarCollapsed ? 'gap-2' : 'flex-row'}`}>
+                <div className={`p-4 pb-3 flex items-center justify-between ${sidebarCollapsed ? 'flex-col gap-2' : 'flex-row'}`}>
                     {!sidebarCollapsed ? (
                         <div>
                             <h1 className="text-2xl font-black tracking-tight flex items-center gap-1">
@@ -459,14 +473,26 @@ export default function ChatApp() {
                             <span className="gradient-text">K</span>
                         </h1>
                     )}
-                    <button 
-                        onClick={() => setSidebarCollapsed(!sidebarCollapsed)} 
-                        className={`p-1.5 rounded-lg transition-colors cursor-pointer hidden md:block ${
-                            darkMode ? 'text-dark-muted hover:bg-white/5 hover:text-dark-text' : 'text-white/60 hover:bg-white/10 hover:text-white'
-                        }`}
-                    >
-                        <SidebarIcon />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        {/* Mobile close button */}
+                        <button
+                            onClick={() => { setMobileSidebarOpen(false); }}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer md:hidden ${
+                                darkMode ? 'text-dark-muted hover:bg-white/5 hover:text-dark-text' : 'text-white/60 hover:bg-white/10 hover:text-white'
+                            }`}
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                        {/* Desktop collapse button */}
+                        <button 
+                            onClick={() => setSidebarCollapsed(!sidebarCollapsed)} 
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer hidden md:block ${
+                                darkMode ? 'text-dark-muted hover:bg-white/5 hover:text-dark-text' : 'text-white/60 hover:bg-white/10 hover:text-white'
+                            }`}
+                        >
+                            <SidebarIcon />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="px-3 mt-4 flex justify-center">
@@ -487,7 +513,7 @@ export default function ChatApp() {
                 </div>
 
                 <nav className="px-3 mt-4 space-y-1">
-                    <button onClick={() => { setShowHelp(false); setShowHistory(false); setActiveProduct(null); setActivePayment(null); }}
+                    <button onClick={() => { setShowHelp(false); setShowHistory(false); setActiveProduct(null); setActivePayment(null); setMobileSidebarOpen(false); }}
                         className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer ${
                             sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full px-4 text-left'
                         } ${
@@ -500,7 +526,7 @@ export default function ChatApp() {
                         <span className="flex items-center justify-center"><ChatIcon /></span>
                         {!sidebarCollapsed && "Active Chat"}
                     </button>
-                    <button onClick={() => { setShowHelp(true); setShowHistory(false); setActiveProduct(null); setActivePayment(null); }}
+                    <button onClick={() => { setShowHelp(true); setShowHistory(false); setActiveProduct(null); setActivePayment(null); setMobileSidebarOpen(false); }}
                         className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
                             sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full px-4 text-left'
                         } ${
@@ -513,7 +539,7 @@ export default function ChatApp() {
                         <span className="flex items-center justify-center"><HelpIcon /></span>
                         {!sidebarCollapsed && "How to Use"}
                     </button>
-                    <button onClick={() => { setShowHelp(false); setShowHistory(true); setActiveProduct(null); setActivePayment(null); }}
+                    <button onClick={() => { setShowHelp(false); setShowHistory(true); setActiveProduct(null); setActivePayment(null); setMobileSidebarOpen(false); }}
                         className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
                             sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full px-4 text-left'
                         } ${
@@ -526,7 +552,7 @@ export default function ChatApp() {
                         <span className="flex items-center justify-center"><HistoryIcon /></span>
                         {!sidebarCollapsed && "Order History"}
                     </button>
-                    <button onClick={() => { setShowHelp(false); setShowHistory(false); setActiveProduct(null); setActivePayment(null); sendMessage("Show me all categories"); }}
+                    <button onClick={() => { setShowHelp(false); setShowHistory(false); setActiveProduct(null); setActivePayment(null); setMobileSidebarOpen(false); sendMessage("Show me all categories"); }}
                         className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
                             sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full px-4 text-left'
                         } ${
@@ -790,7 +816,9 @@ export default function ChatApp() {
                 }`}>
                     <div className="flex justify-between items-center w-full">
                         <div className="flex items-center gap-1.5 z-30">
-                            <button className={`relative z-30 p-2 cursor-pointer flex items-center justify-center rounded-lg transition-colors ${darkMode ? 'text-white hover:bg-white/10' : 'text-white/80 hover:bg-white/20'}`}>
+                            <button
+                                onClick={() => setMobileSidebarOpen(true)}
+                                className={`relative z-30 p-2 cursor-pointer flex items-center justify-center rounded-lg transition-colors ${darkMode ? 'text-white hover:bg-white/10' : 'text-white/80 hover:bg-white/20'}`}>
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                             </button>
                             <h1 className="text-base font-bold text-white whitespace-nowrap">Ayla</h1>
@@ -958,7 +986,7 @@ export default function ChatApp() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.5 }}
-                            className="fixed right-[-10%] md:right-[-15%] lg:right-[-12%] 2xl:right-[-10%] top-[10%] md:top-[15%] w-72 h-72 md:w-[500px] md:h-[500px] lg:w-[700px] lg:h-[950px] 2xl:w-[850px] 2xl:h-[950px] opacity-100 dark:opacity-100 pointer-events-none z-10 blur-[0.5px] drop-shadow-2xl"
+                            className="hidden sm:block fixed right-[-10%] md:right-[-15%] lg:right-[-12%] 2xl:right-[-10%] top-[10%] md:top-[15%] w-72 h-72 md:w-[500px] md:h-[500px] lg:w-[700px] lg:h-[950px] 2xl:w-[850px] 2xl:h-[950px] opacity-100 dark:opacity-100 pointer-events-none z-10 blur-[0.5px] drop-shadow-2xl"
                         >
                             <img src="/ayla_3d_avatar.png" alt="Ayla AI" className="w-full h-full object-contain relative z-10" />
                         </motion.div>
@@ -1041,6 +1069,32 @@ export default function ChatApp() {
                                     </div>
 
                                 </motion.div>
+
+                                    {/* Mobile-only Quick Prompts */}
+                                    <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="md:hidden w-full max-w-lg text-left px-4">
+                                        <p className={`text-xs font-bold uppercase tracking-widest mb-3 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>
+                                            {translations[currentLang].tryPrompts}
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-2.5">
+                                            {[
+                                                { t: "Find gifts under Rs. 5,000", i: "🏷️" },
+                                                { t: "Birthday cakes", i: "🎂" },
+                                                { t: "Anniversary hampers", i: "🥂" },
+                                                { t: "Premium Luxury Gifts", i: "💎" },
+                                            ].map((p, i) => (
+                                                <button 
+                                                    key={i}
+                                                    onClick={() => sendMessage(p.t)}
+                                                    className={`text-left p-3.5 rounded-2xl border transition-all duration-200 flex items-start gap-2 cursor-pointer active:scale-95 ${
+                                                        darkMode ? 'bg-dark-card/50 border-dark-border hover:border-brand-purple-accent/50' : 'bg-white border-gray-200 shadow-sm hover:border-brand-purple'
+                                                    }`}
+                                                >
+                                                    <span className="text-lg">{p.i}</span>
+                                                    <span className={`text-xs font-semibold leading-snug ${darkMode ? 'text-dark-text' : 'text-gray-700'}`}>{p.t}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </motion.div>
 
                                     {/* Scroll Down Indicator */}
                                     <motion.div 
@@ -1837,7 +1891,7 @@ export default function ChatApp() {
                         animate={{ x: 0, opacity: 1 }}
                         exit={{ x: 400, opacity: 0 }}
                         transition={{ type: "spring", stiffness: 280, damping: 28 }}
-                        className={`absolute right-0 top-0 bottom-0 lg:relative w-full sm:w-[320px] laptop:w-[400px] flex flex-col z-40 h-full transition-colors duration-300 shadow-2xl lg:shadow-none ${
+                        className={`fixed md:absolute right-0 top-0 bottom-0 lg:relative w-full sm:w-[360px] laptop:w-[400px] flex flex-col z-50 h-full transition-colors duration-300 shadow-2xl lg:shadow-none ${
                             darkMode
                                 ? 'bg-dark-surface/95 backdrop-blur-xl border-l border-dark-border'
                                 : 'bg-white/95 backdrop-blur-xl border-l border-[#002F6C]/10'
@@ -1986,7 +2040,7 @@ export default function ChatApp() {
                         animate={{ x: 0, opacity: 1 }}
                         exit={{ x: 450, opacity: 0 }}
                         transition={{ type: "spring", stiffness: 280, damping: 28 }}
-                        className={`w-96 lg:w-[460px] flex flex-col z-30 h-full transition-colors duration-300 ${
+                        className={`fixed md:relative right-0 top-0 bottom-0 w-full md:w-96 lg:w-[460px] flex flex-col z-50 h-full transition-colors duration-300 ${
                             darkMode
                                 ? 'bg-dark-surface/95 backdrop-blur-xl border-l border-dark-border'
                                 : 'bg-white/95 backdrop-blur-xl border-l border-[#002F6C]/10 shadow-2xl'
@@ -2408,7 +2462,7 @@ export default function ChatApp() {
                         animate={{ x: 0, opacity: 1 }}
                         exit={{ x: 400, opacity: 0 }}
                         transition={{ type: "spring", stiffness: 280, damping: 28 }}
-                        className={`w-80 lg:w-[400px] flex flex-col z-30 h-full transition-colors duration-300 ${
+                        className={`fixed md:relative right-0 top-0 bottom-0 w-full md:w-80 lg:w-[400px] flex flex-col z-50 h-full transition-colors duration-300 ${
                             darkMode
                                 ? 'bg-dark-surface/95 backdrop-blur-xl border-l border-dark-border'
                                 : 'bg-white/95 backdrop-blur-xl border-l border-[#002F6C]/10 shadow-2xl'
@@ -2502,7 +2556,7 @@ export default function ChatApp() {
                         animate={{ x: 0, opacity: 1 }}
                         exit={{ x: 400, opacity: 0 }}
                         transition={{ type: "spring", stiffness: 280, damping: 28 }}
-                        className={`absolute right-0 top-0 bottom-0 lg:relative w-full sm:w-[320px] laptop:w-[400px] flex flex-col z-40 h-full transition-colors duration-300 shadow-2xl lg:shadow-none ${
+                        className={`fixed md:absolute right-0 top-0 bottom-0 w-full sm:w-[360px] laptop:w-[400px] flex flex-col z-50 h-full transition-colors duration-300 shadow-2xl ${
                             darkMode
                                 ? 'bg-dark-surface/95 backdrop-blur-xl border-l border-dark-border'
                                 : 'bg-white/95 backdrop-blur-xl border-l border-[#002F6C]/10'

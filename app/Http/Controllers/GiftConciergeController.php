@@ -685,6 +685,40 @@ class GiftConciergeController extends Controller
 
         $lang = $this->detectLanguage($userMessage);
 
+        // For Singlish/Tanglish, ALWAYS override with a localised response
+        // (the LLM typically replies in English even when the user wrote in Singlish/Tanglish)
+        if (in_array($lang, ['singlish', 'tanglish'])) {
+            $hasResults = $toolName === 'kapruka_search_products'
+                ? (isset($cleanPayload['results']) && is_array($cleanPayload['results']) && !empty($cleanPayload['results']))
+                : true;
+            $hasError = $toolName === 'kapruka_search_products'
+                ? (isset($cleanPayload['text_content']) && (str_contains(strtolower($cleanPayload['text_content']), 'no products found') || str_contains(strtolower($cleanPayload['text_content']), 'error')))
+                : false;
+            $noResults = ($toolName === 'kapruka_search_products') && (!$hasResults || $hasError);
+
+            if ($lang === 'singlish') {
+                $text = match(true) {
+                    $toolName === 'kapruka_search_products' && $noResults  => "Aiyo! Sorry anee, mata oya hoyana ekata match wena mukuth hoyaganna bari una. Wena widihakata try karamuda?",
+                    $toolName === 'kapruka_search_products'               => "Ayubowan! 🎁 Kapruka eke thiyena best matches tikak mama oya wenuwen hoyagaththa. Poddak balanna:",
+                    $toolName === 'kapruka_get_product'                   => "Menna me product eke full details — thawa wisthara one nam Inspector panel eka balanna! ✨",
+                    $toolName === 'kapruka_check_delivery'                => "Mama oya wenuwen delivery details check kala — menna mata hambechcha wisthara: 🚚",
+                    $toolName === 'kapruka_create_order'                  => "Oyage order eka successfully create una! Payment eka complete karanna me link eka pawichchi karanna: 🛍️",
+                    $toolName === 'kapruka_track_order'                   => "Menna oyage order eke tracking timeline eka: 📦",
+                    default                                               => "Menna Kapruka database eken gaththa details:",
+                };
+            } else { // tanglish
+                $text = match(true) {
+                    $toolName === 'kapruka_search_products' && $noResults  => "Aiyo! Sorry, neenga thedura products eduvum kidaikala. Vera perula thedi paarkalama?",
+                    $toolName === 'kapruka_search_products'               => "Vanakkam! 🎁 Kapruka catalog la irunthu ungaluku etha nalla products konjam kandu pudichiruken. Paarunga:",
+                    $toolName === 'kapruka_get_product'                   => "Intha product oda full details itho — innum pakka Inspector panel ah paarunga! ✨",
+                    $toolName === 'kapruka_check_delivery'                => "Ungalukkaga delivery options check pannen — itho details: 🚚",
+                    $toolName === 'kapruka_create_order'                  => "Unga order create agiduchu! Payment ah complete panna keela iruka link ah use pannunga: 🛍️",
+                    $toolName === 'kapruka_track_order'                   => "Unga order oda tracking timeline itho: 📦",
+                    default                                               => "Kapruka database la irunthu details itho:",
+                };
+            }
+        }
+
         // Standardise responses when stripped or default text is returned
         if (empty($text) || strlen($text) < 10 || str_starts_with(strtolower($text), 'here are your results') || $text === 'Here are your results.') {
             if ($toolName === 'kapruka_search_products') {
@@ -696,6 +730,10 @@ class GiftConciergeController extends Controller
                         $text = "සමාවෙන්න! මට ඒ සඳහා ගැලපෙන භාණ්ඩ කිසිවක් සොයාගත නොහැකි විය. කරුණාකර වෙනත් නමකින් උත්සාහ කරන්න.";
                     } elseif ($lang === 'ta') {
                         $text = "மன்னிக்கவும்! இதற்கான எந்தப் பொருட்களையும் என்னால் கண்டுபிடிக்க முடியவில்லை. தயவுசெய்து வேறு பெயரில் முயற்சிக்கவும்.";
+                    } elseif ($lang === 'singlish') {
+                        $text = "Aiyo! Sorry anee, mata oya hoyana ekata match wena mukuth hoyaganna bari una. Wena widihakata try karamuda?";
+                    } elseif ($lang === 'tanglish') {
+                        $text = "Aiyo! Sorry, neenga thedura products eduvum kidaikala. Vera perula thedi paarkalama?";
                     } else {
                         $text = "Aiyo! I'm so sorry, but I couldn't find any products matching your search right now. Could we try a broader search or different keywords?";
                     }
@@ -704,6 +742,10 @@ class GiftConciergeController extends Controller
                         $text = "ආයුබෝවන්! 🎁 මම කපෘක නාමාවලියෙන් ඔබට ගැලපෙන හොඳම දේවල් කිහිපයක් සෙව්වා. බලන්න:";
                     } elseif ($lang === 'ta') {
                         $text = "வணக்கம்! 🎁 கப்புகா பட்டியலில் உங்களுக்கான சில சிறந்த பொருத்தங்களை நான் கண்டறிந்தேன். பாருங்கள்:";
+                    } elseif ($lang === 'singlish') {
+                        $text = "Ayubowan! 🎁 Kapruka eke thiyena best matches tikak mama oya wenuwen hoyagaththa. Poddak balanna:";
+                    } elseif ($lang === 'tanglish') {
+                        $text = "Vanakkam! 🎁 Kapruka catalog la irunthu ungaluku etha nalla products konjam kandu pudichiruken. Paarunga:";
                     } else {
                         $text = "Ayubowan! 🎁 I found some great matches in the Kapruka catalog for you. Take a look:";
                     }
@@ -713,6 +755,10 @@ class GiftConciergeController extends Controller
                     $text = "මෙන්න මෙම භාණ්ඩයේ සම්පූර්ණ විස්තර — වැඩි විස්තර සඳහා ඉන්ස්පෙක්ටර් පැනලය බලන්න! ✨";
                 } elseif ($lang === 'ta') {
                     $text = "இந்த தயாரிப்பின் முழு விவரங்கள் இதோ — மேலும் அறிய இன்ஸ்பெக்டர் பேனலைப் பார்க்கவும்! ✨";
+                } elseif ($lang === 'singlish') {
+                    $text = "Menna me product eke full details — thawa wisthara one nam Inspector panel eka balanna! ✨";
+                } elseif ($lang === 'tanglish') {
+                    $text = "Intha product oda full details itho — innum pakka Inspector panel ah paarunga! ✨";
                 } else {
                     $text = "Here are the full details for this product — check out the Inspector panel for more! ✨";
                 }
@@ -721,6 +767,10 @@ class GiftConciergeController extends Controller
                     $text = "මම ඔබ වෙනුවෙන් බෙදාහැරීමේ තොරතුරු පරීක්ෂා කළා — මට හමු වූ දේ මෙන්න: 🚚";
                 } elseif ($lang === 'ta') {
                     $text = "உங்களுக்கான டெலிவரி விருப்பங்களை நான் சரிபார்த்தேன் — நான் கண்டறிந்தது இதோ: 🚚";
+                } elseif ($lang === 'singlish') {
+                    $text = "Mama oya wenuwen delivery details check kala — menna mata hambechcha wisthara: 🚚";
+                } elseif ($lang === 'tanglish') {
+                    $text = "Ungalukkaga delivery options check pannen — itho details: 🚚";
                 } else {
                     $text = "I've checked the delivery options for you — here's what I found: 🚚";
                 }
@@ -729,6 +779,10 @@ class GiftConciergeController extends Controller
                     $text = "ඔබගේ ඇණවුම සාර්ථකව නිර්මාණය කළා! ගෙවීම් සම්පූර්ණ කිරීමට පහත සබැඳිය භාවිතා කරන්න: 🛍️";
                 } elseif ($lang === 'ta') {
                     $text = "உங்கள் ஆர்டர் உருவாக்கப்பட்டது! உங்கள் கட்டணத்தை முடிக்க கீழே உள்ள இணைப்பைப் பயன்படுத்தவும்: 🛍️";
+                } elseif ($lang === 'singlish') {
+                    $text = "Oyage order eka successfully create una! Payment eka complete karanna me link eka pawichchi karanna: 🛍️";
+                } elseif ($lang === 'tanglish') {
+                    $text = "Unga order create agiduchu! Payment ah complete panna keela iruka link ah use pannunga: 🛍️";
                 } else {
                     $text = "Your order has been created! Use the secure link below to complete your payment: 🛍️";
                 }
@@ -737,6 +791,10 @@ class GiftConciergeController extends Controller
                     $text = "මෙන්න ඔබගේ ඇණවුම ගමන් කරන ආකාරය: 📦";
                 } elseif ($lang === 'ta') {
                     $text = "உங்கள் ஆர்டரின் கண்காணிப்பு காலவரிசை இதோ: 📦";
+                } elseif ($lang === 'singlish') {
+                    $text = "Menna oyage order eke tracking timeline eka: 📦";
+                } elseif ($lang === 'tanglish') {
+                    $text = "Unga order oda tracking timeline itho: 📦";
                 } else {
                     $text = "Here's the tracking timeline for your order: 📦";
                 }
@@ -745,6 +803,10 @@ class GiftConciergeController extends Controller
                     $text = "මෙන්න කපෘක දත්ත ගබඩාවෙන් ලැබුණු තොරතුරු:";
                 } elseif ($lang === 'ta') {
                     $text = "கப்புகா தரவுத்தளத்திலிருந்து விவரங்கள் இதோ:";
+                } elseif ($lang === 'singlish') {
+                    $text = "Menna Kapruka database eken gaththa details:";
+                } elseif ($lang === 'tanglish') {
+                    $text = "Kapruka database la irunthu details itho:";
                 } else {
                     $text = "Here are the details from the Kapruka database:";
                 }
@@ -846,16 +908,21 @@ class GiftConciergeController extends Controller
         }
         
         // Singlish / Tanglish simple heuristic checks
-        $lowered = strtolower($message);
-        $localKeywords = [
-            // Singlish
-            'koheda', 'puluwanda', 'meka', 'keeyada', 'ganna', 'machan', 'aiyo', 'ane', 'lah', 'epako', 'neda', 'nadda', 'thiyenawada', 'hari', 'elakiri', 'ada', 'heta', 'oya',
-            // Tanglish
-            'thambi', 'enna', 'illai', 'iruku', 'sapadu', 'mudiyuma', 'romba', 'nalla', 'panna', 'vanakkam', 'nanri', 'eppadi', 'irukinga', 'enga', 'kuda', 'teriyum', 'illia'
+        $singlishKeywords = [
+            'koheda', 'puluwanda', 'meka', 'keeyada', 'ganna', 'machan', 'aiyo', 'ane', 'lah', 'epako', 'neda', 'nadda', 'thiyenawada', 'hari', 'elakiri', 'ada', 'heta', 'oya', 'mata', 'pennanna', 'pennanko', 'tikkakui', 'tikak', 'koko', 'naa', 'kohomada', 'moko', 'monawada', 'kiyada'
         ];
-        foreach ($localKeywords as $kw) {
-            if (str_contains($lowered, $kw)) {
-                return 'en-lk'; // Localized English/Singlish/Tanglish dialect
+        foreach ($singlishKeywords as $kw) {
+            if (preg_match('/\b' . preg_quote($kw, '/') . '\b/i', $message)) {
+                return 'singlish'; 
+            }
+        }
+
+        $tanglishKeywords = [
+            'thambi', 'enna', 'illai', 'iruku', 'sapadu', 'mudiyuma', 'romba', 'nalla', 'panna', 'vanakkam', 'nanri', 'eppadi', 'irukinga', 'enga', 'kuda', 'teriyum', 'illia', 'enakku', 'vaanga', 'sollunga'
+        ];
+        foreach ($tanglishKeywords as $kw) {
+            if (preg_match('/\b' . preg_quote($kw, '/') . '\b/i', $message)) {
+                return 'tanglish';
             }
         }
         
