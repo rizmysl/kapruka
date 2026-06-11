@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect, Fragment } from 'react';
+import { useState, useRef, useEffect, Fragment, startTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
+import confetti from 'canvas-confetti';
 
 import { getParsedData, getDynamicGreeting } from './utils/helpers';
 import { ImageWithFallback } from './components/common/ImageWithFallback';
@@ -26,6 +27,7 @@ interface Message {
   text: string;
   tool?: string;
   raw_data?: RawData;
+  image?: string;
 }
 
 interface ChatSession {
@@ -38,10 +40,58 @@ interface ChatSession {
 const shoppingPattern = `url('data:image/svg+xml;utf8,<svg width="150" height="150" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 20 30 h 20 v 20 h -20 z"/><path d="M 30 30 v 20"/><path d="M 20 40 h 20"/><path d="M 30 30 c -4 -6 -10 -2 -5 2 c 5 4 5 -2 5 -2"/><path d="M 30 30 c 4 -6 10 -2 5 2 c -5 4 -5 -2 -5 -2"/><path d="M 100 25 c -3 -3 -8 -3 -11 0 c -2 2 -3 5 -2 8 c 2 6 13 15 13 15 s 11 -9 13 -15 c 1 -3 0 -6 -2 -8 c -3 -3 -8 -3 -11 0 z" fill="black"/><path d="M 25 100 h 16 l 2 20 h -20 z"/><path d="M 29 100 a 4 4 0 0 1 8 0"/><path d="M 105 110 c -5 -5 0 -12 5 -7 c 5 -5 12 0 7 5 c 5 5 0 12 -5 7 c -5 5 -12 0 -7 -5 z"/><circle cx="110" cy="115" r="2" fill="black"/><path d="M 60 20 l 2 6 l 6 2 l -6 2 l -2 6 l -2 -6 l -6 -2 l 6 -2 z" fill="black" stroke="none"/><path d="M 55 80 l 10 0 l -2 10 l -6 0 z"/><path d="M 53 80 c 0 -8 14 -8 14 0" fill="black"/><circle cx="60" cy="70" r="1.5" fill="black" stroke="none"/><path d="M 125 65 c -5 -5 -10 5 0 5 c 10 -5 5 -15 0 -5 z"/><path d="M 80 120 c 5 -10 15 -10 10 0 c -2 5 -8 5 -10 0 z"/><path d="M 85 122 v 10"/><path d="M 130 90 c -2 0 -4 -2 -4 -4 v -10 c 0 -2 2 -4 4 -4 h 10 c 2 0 4 2 4 4 v 10 c 0 2 -2 4 -4 4 z"/><path d="M 135 80 l -5 10"/><path d="M 40 130 c -2 -2 -5 -2 -7 0 c -2 2 -2 5 0 7 c 2 2 5 2 7 0 c 2 -2 2 -5 0 -7 z"/><path d="M 15 65 h 5 v 5 h -5 z" fill="black"/></svg>')`;
 
 import { translations } from './translations';
-const getInitialWelcomeMsg = (): Message => ({ 
-    role: 'bot', 
-    text: `${getDynamicGreeting()} I'm your Colombo Gift Concierge — powered by AI. Tell me who you're shopping for, and I'll find the perfect gift!` 
-});
+
+// ── Sri Lankan occasions & holidays awareness ──
+const getSriLankaOccasion = (): string | null => {
+    const now = new Date();
+    const month = now.getMonth() + 1; // 1-12
+    const day = now.getDate();
+    const hour = now.getHours();
+
+    // Major Sri Lankan occasions
+    if (month === 4 && day >= 10 && day <= 16) return 'Sinhala & Tamil New Year is coming up 🎊';
+    if (month === 2 && day >= 12 && day <= 16) return "Valentine's Day is around the corner 💝";
+    if (month === 5 && day >= 9 && day <= 14) return "Mother's Day is coming up 💐";
+    if (month === 12 && day >= 20 && day <= 31) return 'Christmas season is here 🎄';
+    if (month === 12 && day >= 28 || (month === 1 && day <= 3)) return 'New Year celebrations are here 🎉';
+    if (month === 6 && day >= 14 && day <= 18) return 'Poson Poya is approaching 🌕';
+    if (month === 5 && day >= 20 && day <= 25) return 'Vesak season is here 🏮';
+    if (month === 6 && day >= 18 && day <= 22) return "Father's Day is coming up 👨‍👧";
+    // Time-of-day context
+    if (hour >= 6 && hour < 11) return null; // morning — no special occasion
+    if (hour >= 11 && hour < 14) return null;
+    return null;
+};
+
+const getInitialWelcomeMsg = (): Message => {
+    const occasion = getSriLankaOccasion();
+    const occasionLine = occasion ? `\n\n✨ *${occasion}* — perfect time to send something special!` : '';
+    return {
+        role: 'bot',
+        text: `${getDynamicGreeting()} I'm **Ayla**, your Kapruka AI Gift Concierge — powered by Gemini & MCP. 🎁${occasionLine}\n\nTell me who you're shopping for and I'll find the perfect gift!`
+    };
+};
+
+// ── Contextual suggestion chips per tool ──
+const getSuggestionsForTool = (tool: string | undefined): string[] => {
+    if (!tool) return ['🎁 Find birthday gifts', '💐 Send flowers', '🎂 Order a cake', '📦 Track my order'];
+    switch (tool) {
+        case 'kapruka_search_products':
+            return ['🔍 Refine search', '📍 Check delivery', '🛒 Add to cart & checkout', '🔀 Show me something different'];
+        case 'kapruka_get_product':
+            return ['🛒 Add to cart', '📍 Check delivery to Colombo', '💬 Tell me more about this', '🔍 Find similar products'];
+        case 'kapruka_check_delivery':
+            return ['✅ Proceed to checkout', '📍 Check another city', '🛒 View my cart', '🔍 Search more gifts'];
+        case 'kapruka_create_order':
+            return ['📦 Track this order', '🎁 Send another gift', '🔍 Browse more products', '🏠 Start over'];
+        case 'kapruka_track_order':
+            return ['📞 Contact support', '🎁 Send another gift', '🔍 Shop for more'];
+        case 'kapruka_list_categories':
+            return ['🎂 Show Cakes', '💐 Show Flowers', '🍫 Show Chocolates', '🧸 Show Soft Toys'];
+        default:
+            return ['🎁 Browse gifts', '📍 Check delivery', '🎂 Birthday ideas', '📦 Track order'];
+    }
+};
 
 export default function ChatApp() {
     const [currentLang, setCurrentLang] = useState<'en' | 'si' | 'ta'>('en');
@@ -123,6 +173,11 @@ export default function ChatApp() {
         setShowHelp(false);
         setShowHistory(false);
         setMobileSidebarOpen(false);
+        // Reset scroll position to top
+        setTimeout(() => {
+            const chatContainer = document.getElementById('main-chat-container');
+            if (chatContainer) chatContainer.scrollTop = 0;
+        }, 10);
     };
 
     const switchSession = (id: string) => {
@@ -132,6 +187,11 @@ export default function ChatApp() {
         setShowHelp(false);
         setShowHistory(false);
         setMobileSidebarOpen(false);
+        // Reset scroll position to top
+        setTimeout(() => {
+            const chatContainer = document.getElementById('main-chat-container');
+            if (chatContainer) chatContainer.scrollTop = 0;
+        }, 10);
     };
 
     const deleteSession = (e: React.MouseEvent, id: string) => {
@@ -160,9 +220,35 @@ export default function ChatApp() {
 
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [loadingPhrase, setLoadingPhrase] = useState('Ayla is thinking...');
     const [activeProduct, setActiveProduct] = useState<any>(null);
     const [activePayment, setActivePayment] = useState<any>(null);
     const [iframeLoading, setIframeLoading] = useState(true);
+    const [suggestedActions, setSuggestedActions] = useState<string[]>(getSuggestionsForTool(undefined));
+    const [prefetchedProducts, setPrefetchedProducts] = useState<any[]>([]);
+    // Gate the Mock/Live dev toggle behind ?dev=true in URL
+    const showDevTools = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('dev') === 'true';
+
+    // ── Image Upload State ──
+    const [attachedImage, setAttachedImage] = useState<string | null>(null);
+    const [attachedImageMime, setAttachedImageMime] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            alert('Please select a valid image file.');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const base64String = event.target?.result as string;
+            setAttachedImage(base64String);
+            setAttachedImageMime(file.type);
+        };
+        reader.readAsDataURL(file);
+    };
 
     // ── Voice Input State ──
     const [isRecording, setIsRecording] = useState(false);
@@ -386,14 +472,64 @@ export default function ChatApp() {
         localStorage.setItem('kapruka-use-mock', String(useMock));
     }, [useMock]);
 
+    // ── Rotating promotional personality phrases ──
+    const loadingPhrases = [
+        "Searching Kapruka's 10,000+ premium gifts... 🎁",
+        "Checking same-day delivery slots in Sri Lanka... 🚚",
+        "Looking for the freshest cakes and flowers... 🎂",
+        "Curating the best options for your loved ones... ✨",
+        "Verifying secure checkout options... 🔒",
+        "Ayla is picking the perfect match... 🌟"
+    ];
+    useEffect(() => {
+        if (!isLoading) return;
+        let i = 0;
+        setLoadingPhrase(loadingPhrases[0]);
+        const interval = setInterval(() => {
+            i = (i + 1) % loadingPhrases.length;
+            setLoadingPhrase(loadingPhrases[i]);
+        }, 2000);
+        return () => clearInterval(interval);
+    }, [isLoading]);
+
+    // ── Prefetch popular products for homepage carousel ──
+    useEffect(() => {
+        const prefetch = async () => {
+            try {
+                const isDev = import.meta.env.MODE === 'development';
+                const apiUrl = isDev ? '/api-proxy/chat/message' : (import.meta.env.VITE_API_URL + '/chat/message');
+                const res = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ message: 'Show me popular gifts', use_mock: false, history: [] })
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                const results = data?.raw_data?.results;
+                if (Array.isArray(results) && results.length > 0) {
+                    setPrefetchedProducts(results.slice(0, 6));
+                }
+            } catch (_) { /* silent fail — homepage still shows emoji fallbacks */ }
+        };
+        prefetch();
+    }, []);
+
 
     const sendMessage = async (eOrText: any) => {
         if (eOrText?.preventDefault) eOrText.preventDefault();
         const userText = typeof eOrText === 'string' ? eOrText : input;
-        if (!userText.trim()) return;
+        if (!userText.trim() && !attachedImage) return;
 
         setInput('');
-        const updatedMessages = [...messages, { role: 'user' as const, text: userText }];
+        
+        // Capture image state for the request
+        const currentImage = attachedImage;
+        const currentMime = attachedImageMime;
+        
+        setAttachedImage(null);
+        setAttachedImageMime(null);
+
+        const updatedMessages = [...messages, { role: 'user' as const, text: userText, image: currentImage || undefined }];
         setMessages(updatedMessages);
         setIsLoading(true);
 
@@ -415,7 +551,13 @@ export default function ChatApp() {
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ message: userText, use_mock: useMock, history })
+                body: JSON.stringify({ 
+                    message: userText, 
+                    use_mock: useMock, 
+                    history,
+                    image: currentImage || undefined,
+                    mime_type: currentMime || undefined
+                })
             });
             const data = await response.json();
             
@@ -433,6 +575,28 @@ export default function ChatApp() {
             
             if (data.tool_called === 'kapruka_get_product' && data.raw_data) {
                 setActiveProduct(getParsedData(data.raw_data));
+            }
+
+            // Update contextual suggestion chips
+            setSuggestedActions(getSuggestionsForTool(data.tool_called));
+
+            // 🎉 Confetti on successful order creation only
+            const isOrderSuccess = data.tool_called === 'kapruka_create_order'
+                && data.raw_data
+                && !data.raw_data?.error
+                && !data.raw_data?.text_content  // Kapruka puts errors here
+                && data.raw_data?.checkout_url || data.raw_data?.payment_url || data.raw_data?.pay_url || data.raw_data?.url  // must have a payment link
+                && !/(sorry|couldn|rate.?limit|failed|error)/i.test(data.text || '');  // LLM text must not be an apology
+
+            if (isOrderSuccess) {
+                confetti({
+                    particleCount: 150,
+                    spread: 80,
+                    origin: { y: 0.6 },
+                    colors: ['#002F6C', '#7A1C2C', '#8B6CE5', '#ffffff', '#FFD700'],
+                });
+                setTimeout(() => confetti({ particleCount: 60, spread: 50, origin: { y: 0.55 }, angle: 60, colors: ['#8B6CE5', '#FFD700'] }), 400);
+                setTimeout(() => confetti({ particleCount: 60, spread: 50, origin: { y: 0.55 }, angle: 120, colors: ['#002F6C', '#ffffff'] }), 600);
             }
         } catch (error) {
             console.error('Chat error:', error);
@@ -645,7 +809,7 @@ export default function ChatApp() {
                 <div className={`px-4 space-y-3 mb-4 ${sidebarCollapsed ? 'flex flex-col items-center px-0' : ''}`}>
                     {/* Dark Mode Toggle */}
                     <button
-                        onClick={() => setDarkMode(!darkMode)}
+                        onClick={() => startTransition(() => setDarkMode(!darkMode))}
                         className={`flex items-center rounded-xl text-sm font-medium transition-all duration-300 cursor-pointer ${
                             sidebarCollapsed 
                                 ? 'w-10 h-10 justify-center p-0 hover:bg-brand-purple/20 text-white'
@@ -670,7 +834,8 @@ export default function ChatApp() {
                         )}
                     </button>
 
-                    {/* Mock/Live Toggle */}
+                    {/* Mock/Live Toggle — only visible in dev mode (?dev=true) */}
+                    {showDevTools && (
                     <div className={`${
                         sidebarCollapsed 
                             ? 'w-10 h-10 flex items-center justify-center rounded-xl cursor-pointer hover:bg-white/10'
@@ -708,6 +873,7 @@ export default function ChatApp() {
                             </div>
                         )}
                     </div>
+                    )}
                 </div>
 
                 {/* Footer */}
@@ -809,7 +975,7 @@ export default function ChatApp() {
                             )}
                         </button>
                         <button
-                            onClick={() => setDarkMode(!darkMode)}
+                            onClick={() => startTransition(() => setDarkMode(!darkMode))}
                             className={`p-2 rounded-lg transition-all duration-200 ${
                                 darkMode
                                     ? 'bg-dark-card text-white hover:bg-brand-purple/20 hover:text-brand-purple border border-dark-border hover:border-brand-purple/50'
@@ -1002,7 +1168,7 @@ export default function ChatApp() {
                             <img src="/ayla_3d_avatar.png" alt="Ayla AI" className="w-full h-full object-contain relative z-10" />
                         </motion.div>
                     )}
-                    <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 md:p-10 space-y-6 relative z-10">
+                    <div id="main-chat-container" className="flex-1 overflow-y-auto overflow-x-hidden p-6 md:p-10 space-y-6 relative z-10">
                         <AnimatePresence>
                         {messages.length === 1 ? (
                             <motion.div
@@ -1251,24 +1417,42 @@ export default function ChatApp() {
                                         <style>{`
                                             .hide-scrollbar::-webkit-scrollbar { display: none; }
                                         `}</style>
-                                        {[
-                                            { name: "Premium Red Roses Bouquet", price: "LKR 8,500", img: "🌹" },
-                                            { name: "Ribbon Cake 1Kg", price: "LKR 4,200", img: "🍰" },
-                                            { name: "Ferrero Rocher 24 Pcs", price: "LKR 6,800", img: "🍫" },
-                                            { name: "Customized Photo Frame", price: "LKR 3,500", img: "🖼️" },
-                                            { name: "Fruit & Cheese Hamper", price: "LKR 12,000", img: "🍇" },
-                                            { name: "Soft Teddy Bear (Large)", price: "LKR 7,500", img: "🧸" }
-                                        ].map((prod, i) => (
-                                            <div key={i} className={`min-w-[200px] md:min-w-[240px] snap-start flex flex-col p-4 rounded-3xl border transition-all duration-300 cursor-pointer ${
-                                                darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple-accent' : 'bg-white border-gray-100 shadow-md hover:shadow-xl hover:border-brand-purple/50'
-                                            }`} onClick={() => sendMessage(`I want to buy a ${prod.name}`)}>
-                                                <div className={`h-32 rounded-2xl flex items-center justify-center text-6xl mb-4 ${darkMode ? 'bg-dark-surface' : 'bg-gray-50'}`}>
-                                                    {prod.img}
+                                        {(prefetchedProducts.length > 0 ? prefetchedProducts : [
+                                            { id: 'fb1', name: "Premium Red Roses Bouquet", price: { amount: 8500, currency: 'LKR' }, img: "🌹", in_stock: true },
+                                            { id: 'fb2', name: "Ribbon Cake 1Kg", price: { amount: 4200, currency: 'LKR' }, img: "🍰", in_stock: true },
+                                            { id: 'fb3', name: "Ferrero Rocher 24 Pcs", price: { amount: 6800, currency: 'LKR' }, img: "🍫", in_stock: true },
+                                            { id: 'fb4', name: "Customized Photo Frame", price: { amount: 3500, currency: 'LKR' }, img: "🖼️", in_stock: true },
+                                            { id: 'fb5', name: "Fruit & Cheese Hamper", price: { amount: 12000, currency: 'LKR' }, img: "🍇", in_stock: true },
+                                            { id: 'fb6', name: "Soft Teddy Bear (Large)", price: { amount: 7500, currency: 'LKR' }, img: "🧸", in_stock: true }
+                                        ]).map((prod: any, i: number) => (
+                                            <motion.div
+                                                key={prod.id || i}
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: i * 0.07 }}
+                                                whileHover={{ y: -4, scale: 1.02 }}
+                                                className={`min-w-[200px] md:min-w-[240px] snap-start flex flex-col p-4 rounded-3xl border transition-all duration-300 cursor-pointer ${
+                                                    darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple-accent' : 'bg-white border-gray-100 shadow-md hover:shadow-xl hover:border-brand-purple/50'
+                                                }`}
+                                                onClick={() => sendMessage(`I want to buy ${prod.name}`)}
+                                            >
+                                                <div className={`h-32 rounded-2xl flex items-center justify-center mb-4 overflow-hidden ${
+                                                    darkMode ? 'bg-dark-surface' : 'bg-gray-50'
+                                                }`}>
+                                                    {prod.image_url ? (
+                                                        <img src={prod.image_url} alt={prod.name} className="max-h-full max-w-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display='none'; }} />
+                                                    ) : (
+                                                        <span className="text-6xl">{prod.img || '🎁'}</span>
+                                                    )}
                                                 </div>
-                                                <h4 className={`font-bold text-xs mb-1 line-clamp-1 ${darkMode ? 'text-dark-text' : 'text-gray-900'}`}>{prod.name}</h4>
-                                                <p className="text-[10px] text-brand-purple font-bold mt-1">{prod.price}</p>
-                                                <div className="mt-3 inline-block px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[8px] font-bold uppercase rounded-full self-start">Available Today</div>
-                                            </div>
+                                                <h4 className={`font-bold text-xs mb-1 line-clamp-2 ${darkMode ? 'text-dark-text' : 'text-gray-900'}`}>{prod.name}</h4>
+                                                <p className="text-[10px] text-brand-purple font-bold mt-1">
+                                                    {prod.price?.currency || 'LKR'} {(prod.price?.amount || prod.price)?.toLocaleString?.() ?? prod.price}
+                                                </p>
+                                                <div className="mt-3 inline-block px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[8px] font-bold uppercase rounded-full self-start">
+                                                    {prod.in_stock !== false ? 'Available Today' : 'Out of Stock'}
+                                                </div>
+                                            </motion.div>
                                         ))}
                                     </div>
                                 </motion.div>
@@ -1412,7 +1596,7 @@ export default function ChatApp() {
                                                             </div>
 
                                                             {/* CTA Button */}
-                                                            <div>
+                                                            <div className="flex flex-col gap-2">
                                                                 {cart.find(p => p.id === product.id) ? (
                                                                     <div className={`flex items-center justify-between rounded-xl p-1 border ${darkMode ? 'bg-brand-purple-accent/10 border-brand-purple-accent/20' : 'bg-brand-purple/10 border-brand-purple/20'}`}>
                                                                         <button onClick={() => removeFromCart(product.id)} className={`w-8 h-8 flex items-center justify-center font-bold text-lg rounded-lg transition-colors ${darkMode ? 'text-brand-purple-accent hover:bg-brand-purple-accent/20' : 'text-brand-purple hover:bg-brand-purple/20'}`}>-</button>
@@ -1427,6 +1611,20 @@ export default function ChatApp() {
                                                                     >
                                                                         Add to Cart
                                                                     </button>
+                                                                )}
+                                                                {/* WhatsApp Share */}
+                                                                {product.url && (
+                                                                    <a
+                                                                        href={`https://wa.me/?text=${encodeURIComponent(`Hey! Found this on Kapruka 🛍️%0A*${product.name}*%0APrice: ${product.price?.currency || 'LKR'} ${product.price?.amount?.toLocaleString?.() || product.price}%0A${product.url}`)}`}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className={`w-full py-2 rounded-xl text-[11px] font-bold text-center transition-all duration-200 flex items-center justify-center gap-1.5 ${
+                                                                            darkMode ? 'bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/30 hover:bg-[#25D366]/20' : 'bg-[#25D366]/10 text-[#128C7E] border border-[#25D366]/30 hover:bg-[#25D366]/20'
+                                                                        }`}
+                                                                    >
+                                                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                                                                        Share via WhatsApp
+                                                                    </a>
                                                                 )}
                                                             </div>
                                                         </div>
@@ -1830,20 +2028,64 @@ export default function ChatApp() {
                     )}
                     </AnimatePresence>
 
-                    {/* Loading Indicator */}
+                    {/* Loading Indicator — Personality Phrases */}
                     {isLoading && (
                         <div className="flex justify-start">
-                            <div className={`p-4 rounded-3xl rounded-bl-lg shadow-sm flex gap-2.5 items-center ${
-                                darkMode ? 'glass' : 'glass-strong'
-                            }`}>
-                                <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.2 }}
-                                    className="w-2.5 h-2.5 bg-gradient-to-r from-pink-400 to-pink-600 rounded-full" />
-                                <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.2 }}
-                                    className="w-2.5 h-2.5 bg-gradient-to-r from-pink-400 to-pink-600 rounded-full" />
-                                <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.4 }}
-                                    className="w-2.5 h-2.5 bg-gradient-to-r from-pink-400 to-pink-600 rounded-full" />
-                            </div>
+                            <motion.div
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className={`p-4 rounded-3xl rounded-bl-lg shadow-sm flex gap-3 items-center max-w-xs ${
+                                    darkMode ? 'glass' : 'glass-strong'
+                                }`}
+                            >
+                                <div className="flex gap-1.5 items-center flex-shrink-0">
+                                    <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.2 }}
+                                        className="w-2 h-2 bg-gradient-to-r from-pink-400 to-brand-purple rounded-full" />
+                                    <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.2 }}
+                                        className="w-2 h-2 bg-gradient-to-r from-pink-400 to-brand-purple rounded-full" />
+                                    <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.4 }}
+                                        className="w-2 h-2 bg-gradient-to-r from-pink-400 to-brand-purple rounded-full" />
+                                </div>
+                                <motion.span
+                                    key={loadingPhrase}
+                                    initial={{ opacity: 0, x: 6 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    className={`text-xs font-semibold italic ${
+                                        darkMode ? 'text-dark-muted' : 'text-gray-500'
+                                    }`}
+                                >
+                                    {loadingPhrase}
+                                </motion.span>
+                            </motion.div>
                         </div>
+                    )}
+
+                    {/* ── Smart Contextual Suggestion Chips ── */}
+                    {!isLoading && messages.length > 1 && (
+                        <motion.div
+                            key={suggestedActions.join('')}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 }}
+                            className="flex flex-wrap gap-2 pb-2"
+                        >
+                            {suggestedActions.map((action, i) => (
+                                <motion.button
+                                    key={action}
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: 0.1 * i }}
+                                    onClick={() => sendMessage(action.replace(/^[\p{Emoji}\s]+/u, '').trim())}
+                                    className={`px-3.5 py-2 rounded-full text-[11px] font-semibold transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer border ${
+                                        darkMode
+                                            ? 'bg-dark-card border-dark-border text-dark-muted hover:bg-brand-purple/15 hover:text-brand-purple-accent hover:border-brand-purple/40'
+                                            : 'bg-white border-gray-200 text-gray-600 hover:bg-brand-purple hover:text-white hover:border-brand-purple shadow-sm'
+                                    }`}
+                                >
+                                    {action}
+                                </motion.button>
+                            ))}
+                        </motion.div>
                     )}
                     <div ref={messagesEndRef} />
                 </div>
@@ -1853,8 +2095,37 @@ export default function ChatApp() {
                 {/* ── Input Area ── */}
                 <div className="p-4 md:p-6 pt-0 relative z-10">
 
+                    {/* Image Preview Thumbnail */}
+                    <AnimatePresence>
+                        {attachedImage && (
+                            <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9 }}
+                                className="absolute -top-16 left-6 p-1 bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border rounded-xl shadow-lg flex items-center gap-2 group z-20"
+                            >
+                                <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-gray-100 dark:border-dark-border">
+                                    <img src={attachedImage} alt="Preview" className="w-full h-full object-cover" />
+                                </div>
+                                <button 
+                                    onClick={() => { setAttachedImage(null); setAttachedImageMime(null); }}
+                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:scale-110 transition-transform"
+                                >
+                                    <TrashIcon />
+                                </button>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
                     <form onSubmit={sendMessage} className="relative flex items-center w-full">
-                        <button type="button" onClick={() => alert('Image upload coming soon!')} className={`absolute left-2 p-2 rounded-full transition-colors cursor-pointer ${darkMode ? 'text-dark-muted hover:text-dark-text hover:bg-white/10' : 'text-gray-400 hover:text-brand-purple hover:bg-brand-purple/10'}`}>
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            onChange={handleImageSelect} 
+                            accept="image/*" 
+                            className="hidden" 
+                        />
+                        <button type="button" onClick={() => fileInputRef.current?.click()} className={`absolute left-2 p-2 rounded-full transition-colors cursor-pointer ${darkMode ? 'text-dark-muted hover:text-brand-purple-accent hover:bg-white/10' : 'text-gray-400 hover:text-brand-purple hover:bg-brand-purple/10'}`}>
                             <AttachmentIcon />
                         </button>
                         <input

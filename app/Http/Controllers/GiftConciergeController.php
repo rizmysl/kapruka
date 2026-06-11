@@ -265,8 +265,10 @@ class GiftConciergeController extends Controller
 
     $userMessage = $request->input('message');
     $history = $request->input('history', []);
+    $imageBase64 = $request->input('image');
+    $imageMimeType = $request->input('mime_type', 'image/jpeg');
 
-    $llmPayload = $this->prepareLLMPayload($userMessage, $history);
+    $llmPayload = $this->prepareLLMPayload($userMessage, $history, $imageBase64, $imageMimeType);
 
     try {
         // Send request to Gemini
@@ -354,7 +356,7 @@ class GiftConciergeController extends Controller
 
                 // Since we manually extracted and merged it, we can pass $cleanPayloadObj directly. 
                 // finalizeAIResponse handles clean payloads gracefully via the fallback in extractToolPayload.
-                $finalResponse = $this->finalizeAIResponse($userMessage, $history, $toolName, $mergedArguments, $cleanPayloadObj);
+                $finalResponse = $this->finalizeAIResponse($userMessage, $history, $toolName, $mergedArguments, $cleanPayloadObj, $imageBase64, $imageMimeType);
                 return response()->json($finalResponse);
             }
         }
@@ -363,7 +365,7 @@ class GiftConciergeController extends Controller
         $toolName = $toolCalls[0]['name'];
         $arguments = $toolCalls[0]['args'] ?? [];
         $toolResult = $this->executeNodeTool($toolName, $arguments);
-        $finalResponse = $this->finalizeAIResponse($userMessage, $history, $toolName, $arguments, $toolResult);
+        $finalResponse = $this->finalizeAIResponse($userMessage, $history, $toolName, $arguments, $toolResult, $imageBase64, $imageMimeType);
         return response()->json($finalResponse);
     }
     
@@ -373,13 +375,28 @@ class GiftConciergeController extends Controller
     /**
      * Define your tools schema to teach the LLM what it can do
      */
-    private function prepareLLMPayload(string $userMessage, array $history): array
+    private function prepareLLMPayload(string $userMessage, array $history, ?string $imageBase64 = null, ?string $imageMimeType = null): array
     {
         // Add existing conversation history here to maintain state
         $contents = $history;
+        
+        $parts = [['text' => $userMessage]];
+        if ($imageBase64) {
+            // Strip data:image/...;base64, prefix if present
+            if (preg_match('/^data:image\/(\w+);base64,/', $imageBase64, $type)) {
+                $imageBase64 = substr($imageBase64, strpos($imageBase64, ',') + 1);
+            }
+            $parts[] = [
+                'inlineData' => [
+                    'mimeType' => $imageMimeType ?: 'image/jpeg',
+                    'data' => $imageBase64
+                ]
+            ];
+        }
+
         $contents[] = [
             'role' => 'user',
-            'parts' => [['text' => $userMessage]]
+            'parts' => $parts
         ];
 
         return [
@@ -604,7 +621,7 @@ class GiftConciergeController extends Controller
     /**
      * Send the tool output back to the LLM to get a natural language conclusion
      */
-    private function finalizeAIResponse(string $userMessage, array $history, string $toolName, array $arguments, array $toolResult): array
+    private function finalizeAIResponse(string $userMessage, array $history, string $toolName, array $arguments, array $toolResult, ?string $imageBase64 = null, ?string $imageMimeType = null): array
     {
         // Extract the clean data payload from the MCP envelope
         $cleanPayload = $this->extractToolPayload($toolResult);
@@ -615,22 +632,62 @@ class GiftConciergeController extends Controller
 
         // Give the LLM a clear hint if the search returned nothing or threw an error
         $llmContextPayload = $cleanPayload;
+
+        // Detect errors generically (works for all tools)
+        $isToolError = isset($cleanPayload['error']) ||
+            (isset($cleanPayload['text_content']) && (
+                str_contains(strtolower($cleanPayload['text_content']), 'error') ||
+                str_contains(strtolower($cleanPayload['text_content']), 'rate limit') ||
+                str_contains(strtolower($cleanPayload['text_content']), 'failed') ||
+                str_contains(strtolower($cleanPayload['text_content']), 'invalid')
+            ));
+
+        $langNote = match($detectedLang) {
+            'singlish' => "IMPORTANT: The user wrote in Singlish. Your ENTIRE response MUST be in natural, warm Singlish (romanised Sinhala + English mix). Do NOT reply in formal English.",
+            'si'       => "IMPORTANT: The user wrote in Sinhala script. Your ENTIRE response MUST be in Sinhala script (සිංහල).",
+            'ta'       => "IMPORTANT: The user wrote in Tamil. Your ENTIRE response MUST be in Tamil script (தமிழ்).",
+            'tanglish' => "IMPORTANT: The user wrote in Tanglish. Your ENTIRE response MUST be in natural Tanglish (Tamil + English mix).",
+            default    => "",
+        };
+
         if ($toolName === 'kapruka_search_products') {
             $hasNoResults = isset($cleanPayload['results']) && is_array($cleanPayload['results']) && empty($cleanPayload['results']);
             $hasErrorText = isset($cleanPayload['text_content']) && (str_contains(strtolower($cleanPayload['text_content']), 'no products found') || str_contains(strtolower($cleanPayload['text_content']), 'error'));
-            
-            $langNote = match($detectedLang) {
-                'singlish' => "IMPORTANT: The user wrote in Singlish. Your ENTIRE response MUST be in natural, warm Singlish (romanised Sinhala + English mix). Do NOT reply in formal English.",
-                'si'       => "IMPORTANT: The user wrote in Sinhala script. Your ENTIRE response MUST be in Sinhala script (සිංහල).",
-                'ta'       => "IMPORTANT: The user wrote in Tamil. Your ENTIRE response MUST be in Tamil script (தமிழ்).",
-                'tanglish' => "IMPORTANT: The user wrote in Tanglish. Your ENTIRE response MUST be in natural Tanglish (Tamil + English mix).",
-                default    => "",
-            };
+
+            // Detect emotional context in the user's message
+            $emotionalKeywords = ['forgot', 'forget', 'sad', 'stress', 'worried', 'worry', 'urgent', 'help me', 'last minute', 'hurry', 'scared', 'nervous', 'panic', 'problem', 'issue', 'disappointed', 'upset', 'emergency', ':(', ':/', 'ugh', 'oh no'];
+            $msgLower = strtolower($userMessage);
+            $isEmotional = false;
+            foreach ($emotionalKeywords as $kw) {
+                if (str_contains($msgLower, $kw)) { $isEmotional = true; break; }
+            }
 
             if ($hasNoResults || $hasErrorText) {
                 $llmContextPayload['_system_directive_'] = "CRITICAL: The search returned ZERO results or an error. You MUST apologize to the user and say you couldn't find any matches. Do NOT say 'Here are your results'. {$langNote}";
+            } elseif ($isEmotional) {
+                $llmContextPayload['_system_directive_'] = "EMOTIONAL CONTEXT DETECTED in user message: '{$userMessage}'. The user seems stressed, worried, or in a difficult situation. You MUST: 1) Start with a warm, empathetic acknowledgement of their feeling (1 sentence — e.g., 'Aiyo, don't worry!' or 'Ane, no stress!'). 2) Reassure them Kapruka has them covered. 3) Then in 1 sentence introduce the results. Keep it warm and human. {$langNote}";
             } else {
-                $llmContextPayload['_system_directive_'] = "SUCCESS: Products found for '{$searchQuery}'. Write 1-2 friendly sentences introducing the results. {$langNote}";
+                $llmContextPayload['_system_directive_'] = "SUCCESS: Products found for '{$searchQuery}'. Write 1-2 friendly, warm sentences introducing the results. Do NOT just say 'Here are your results' — add a personal touch. {$langNote}";
+            }
+        }
+
+        // For order creation, instruct LLM based on whether there was an error
+        if ($toolName === 'kapruka_create_order') {
+            $orderError = $cleanPayload['error'] ?? null;
+            $orderErrorText = isset($cleanPayload['text_content']) ? $cleanPayload['text_content'] : null;
+            $hasOrderError = $orderError || (
+                $orderErrorText && (
+                    str_contains(strtolower($orderErrorText), 'rate limit') ||
+                    str_contains(strtolower($orderErrorText), 'error') ||
+                    str_contains(strtolower($orderErrorText), 'failed')
+                )
+            );
+
+            if ($hasOrderError) {
+                $errorDetail = $orderError ?? $orderErrorText ?? 'unknown error';
+                $llmContextPayload['_system_directive_'] = "CRITICAL ERROR: The order creation FAILED with error: '{$errorDetail}'. You MUST tell the user their order could NOT be placed, apologize, and suggest they try again in a moment. Do NOT say 'Your order has been created'. {$langNote}";
+            } else {
+                $llmContextPayload['_system_directive_'] = "SUCCESS: The order was created successfully. Briefly confirm the order was placed and remind them to complete payment. {$langNote}";
             }
         }
 
@@ -640,7 +697,21 @@ class GiftConciergeController extends Controller
         // Rebuild conversation tracking following the official Gemini sequence:
         // user (prompt) -> model (functionCall) -> function (functionResponse) -> model (natural text response)
         $contents = $history;
-        $contents[] = ['role' => 'user', 'parts' => [['text' => $userMessage]]];
+        
+        $userParts = [['text' => $userMessage]];
+        if ($imageBase64) {
+            // Strip data:image/...;base64, prefix if present
+            if (preg_match('/^data:image\/(\w+);base64,/', $imageBase64, $type)) {
+                $imageBase64 = substr($imageBase64, strpos($imageBase64, ',') + 1);
+            }
+            $userParts[] = [
+                'inlineData' => [
+                    'mimeType' => $imageMimeType ?: 'image/jpeg',
+                    'data' => $imageBase64
+                ]
+            ];
+        }
+        $contents[] = ['role' => 'user', 'parts' => $userParts];
         
         // 1. Insert the preceding model's functionCall turn
         $contents[] = [
@@ -712,22 +783,39 @@ class GiftConciergeController extends Controller
             if ($lang === 'singlish') {
                 // Build a contextual item label from the search query
                 $itemLabel = !empty($arguments['q']) ? ucfirst($arguments['q']) : 'ekata';
+
+                // Check for order errors before emitting a success string
+                $orderFailed = $toolName === 'kapruka_create_order' && (
+                    isset($cleanPayload['error']) ||
+                    (isset($cleanPayload['text_content']) && str_contains(strtolower($cleanPayload['text_content']), 'rate limit')) ||
+                    (isset($cleanPayload['text_content']) && str_contains(strtolower($cleanPayload['text_content']), 'error'))
+                );
+
                 $text = match(true) {
                     $toolName === 'kapruka_search_products' && $noResults  => "Aiyo! Sorry anee, mata \"{$itemLabel}\" gaena match wena mukuth hoyaganna bari una. Wena widihakata try karamuda? 🙏",
                     $toolName === 'kapruka_search_products'               => "Menna! 🎁 \"{$itemLabel}\" gaena Kapruka eke thiyena best options tikak mama hoyagaththa. Balannako, mekagen ekak oya wage wena ne? 😊",
                     $toolName === 'kapruka_get_product'                   => "Menna me product eke full details — thawa wisthara one nam Inspector panel eka balanna! ✨",
                     $toolName === 'kapruka_check_delivery'                => "Mama oya wenuwen delivery details check kala — menna mata hambechcha wisthara: 🚚",
+                    $toolName === 'kapruka_create_order' && $orderFailed   => "Aiyo! Sorry anee, order eka create karana kota problem ekak una. Rate limit wela wage. Poddak inna, enne try karapalla! 🙏",
                     $toolName === 'kapruka_create_order'                  => "Oyage order eka successfully create una! Payment eka complete karanna me link eka pawichchi karanna: 🛍️",
                     $toolName === 'kapruka_track_order'                   => "Menna oyage order eke tracking timeline eka: 📦",
                     default                                               => "Menna Kapruka database eken gaththa details:",
                 };
             } else { // tanglish
                 $itemLabel = !empty($arguments['q']) ? ucfirst($arguments['q']) : 'ithai';
+
+                $orderFailed = $toolName === 'kapruka_create_order' && (
+                    isset($cleanPayload['error']) ||
+                    (isset($cleanPayload['text_content']) && str_contains(strtolower($cleanPayload['text_content']), 'rate limit')) ||
+                    (isset($cleanPayload['text_content']) && str_contains(strtolower($cleanPayload['text_content']), 'error'))
+                );
+
                 $text = match(true) {
                     $toolName === 'kapruka_search_products' && $noResults  => "Aiyo! Sorry, \"{$itemLabel}\" ku match aana products eduvum kidaikala. Vera perula thedi paarkalama? 🙏",
                     $toolName === 'kapruka_search_products'               => "Paarunga! 🎁 \"{$itemLabel}\" ku Kapruka catalog la irunthu nalla options konjam kandu pudichiruken. Intha list ah parunga! 😊",
                     $toolName === 'kapruka_get_product'                   => "Intha product oda full details itho — innum pakka Inspector panel ah paarunga! ✨",
                     $toolName === 'kapruka_check_delivery'                => "Ungalukkaga delivery options check pannen — itho details: 🚚",
+                    $toolName === 'kapruka_create_order' && $orderFailed   => "Aiyo! Sorry, order create pannumpothu oru problem vanduchu. Rate limit agiduchu pola. Konjam wait panni try pannunga! 🙏",
                     $toolName === 'kapruka_create_order'                  => "Unga order create agiduchu! Payment ah complete panna keela iruka link ah use pannunga: 🛍️",
                     $toolName === 'kapruka_track_order'                   => "Unga order oda tracking timeline itho: 📦",
                     default                                               => "Kapruka database la irunthu details itho:",
@@ -755,16 +843,11 @@ class GiftConciergeController extends Controller
                         $text = "Aiyo! I'm so sorry, but I couldn't find any products matching your search right now. Could we try a broader search or different keywords?";
                     }
                 } else {
-                    if ($lang === 'si') {
-                        $text = "ආයුබෝවන්! 🎁 මම කපෘක නාමාවලියෙන් ඔබට ගැලපෙන හොඳම දේවල් කිහිපයක් සෙව්වා. බලන්න:";
-                    } elseif ($lang === 'ta') {
-                        $text = "வணக்கம்! 🎁 கப்புகா பட்டியலில் உங்களுக்கான சில சிறந்த பொருத்தங்களை நான் கண்டறிந்தேன். பாருங்கள்:";
-                    } elseif ($lang === 'singlish') {
-                        $text = "Ayubowan! 🎁 Kapruka eke thiyena best matches tikak mama oya wenuwen hoyagaththa. Poddak balanna:";
-                    } elseif ($lang === 'tanglish') {
-                        $text = "Vanakkam! 🎁 Kapruka catalog la irunthu ungaluku etha nalla products konjam kandu pudichiruken. Paarunga:";
-                    } else {
-                        $text = "Ayubowan! 🎁 I found some great matches in the Kapruka catalog for you. Take a look:";
+                    // Let the LLM-generated text stand — it already has the emotional context.
+                    // Don't override with a canned cold phrase here.
+                    if (empty($text)) {
+                        // Absolute last-resort fallback only if LLM returned nothing at all
+                        $text = "🎁 Here's what I found on Kapruka for you:";
                     }
                 }
             } elseif ($toolName === 'kapruka_get_product') {
@@ -792,16 +875,43 @@ class GiftConciergeController extends Controller
                     $text = "I've checked the delivery options for you — here's what I found: 🚚";
                 }
             } elseif ($toolName === 'kapruka_create_order') {
-                if ($lang === 'si') {
-                    $text = "ඔබගේ ඇණවුම සාර්ථකව නිර්මාණය කළා! ගෙවීම් සම්පූර්ණ කිරීමට පහත සබැඳිය භාවිතා කරන්න: 🛍️";
-                } elseif ($lang === 'ta') {
-                    $text = "உங்கள் ஆர்டர் உருவாக்கப்பட்டது! உங்கள் கட்டணத்தை முடிக்க கீழே உள்ள இணைப்பைப் பயன்படுத்தவும்: 🛍️";
-                } elseif ($lang === 'singlish') {
-                    $text = "Oyage order eka successfully create una! Payment eka complete karanna me link eka pawichchi karanna: 🛍️";
-                } elseif ($lang === 'tanglish') {
-                    $text = "Unga order create agiduchu! Payment ah complete panna keela iruka link ah use pannunga: 🛍️";
+                // Check for rate limit / API error FIRST before returning a success message
+                $orderErrText = $cleanPayload['error'] ?? $cleanPayload['text_content'] ?? null;
+                $isOrderError = $orderErrText && (
+                    str_contains(strtolower($orderErrText), 'rate limit') ||
+                    str_contains(strtolower($orderErrText), 'error') ||
+                    str_contains(strtolower($orderErrText), 'failed') ||
+                    str_contains(strtolower($orderErrText), 'invalid')
+                );
+
+                if ($isOrderError) {
+                    // Error path — tell user the order failed
+                    if ($lang === 'si') {
+                        $text = "සමාවෙන්න! ඇණවුම නිර්මාණය නොවිය. " . (str_contains(strtolower($orderErrText), 'rate limit') ? "ඉල්ලීම් සීමාව ඉක්මවා ඇත. මොහොතකින් නැවත උත්සාහ කරන්න." : "දෝෂයක් ඇතිවිය. නැවත උත්සාහ කරන්න.");
+                    } elseif ($lang === 'ta') {
+                        $text = "மன்னிக்கவும்! ஆர்டர் உருவாக்கப்படவில்லை. " . (str_contains(strtolower($orderErrText), 'rate limit') ? "கோரிக்கை வரம்பு மீறப்பட்டது. சிறிது நேரம் காத்திருந்து மீண்டும் முயற்சிக்கவும்." : "பிழை ஏற்பட்டது. மீண்டும் முயற்சிக்கவும்.");
+                    } elseif ($lang === 'singlish') {
+                        $text = "Aiyo! Sorry anee, order eka create karana kota problem ekak una — rate limit wela wage. Poddak inna, enne try karapalla! 🙏";
+                    } elseif ($lang === 'tanglish') {
+                        $text = "Aiyo! Sorry, order create pannumpothu oru problem vanduchu — rate limit agiduchu pola. Konjam wait panni try pannunga! 🙏";
+                    } else {
+                        $text = str_contains(strtolower($orderErrText), 'rate limit')
+                            ? "Sorry! The order couldn't be placed — Kapruka's API is a little busy right now (rate limit). Please wait a moment and try again. 🙏"
+                            : "Sorry! The order couldn't be placed due to an error. Please try again in a moment. 🙏";
+                    }
                 } else {
-                    $text = "Your order has been created! Use the secure link below to complete your payment: 🛍️";
+                    // Success path
+                    if ($lang === 'si') {
+                        $text = "ඔබගේ ඇණවුම සාර්ථකව නිර්මාණය කළා! ගෙවීම් සම්පූර්ණ කිරීමට පහත සබැඳිය භාවිතා කරන්න: 🛍️";
+                    } elseif ($lang === 'ta') {
+                        $text = "உங்கள் ஆர்டர் உருவாக்கப்பட்டது! உங்கள் கட்டணத்தை முடிக்க கீழே உள்ள இணைப்பைப் பயன்படுத்தவும்: 🛍️";
+                    } elseif ($lang === 'singlish') {
+                        $text = "Oyage order eka successfully create una! Payment eka complete karanna me link eka pawichchi karanna: 🛍️";
+                    } elseif ($lang === 'tanglish') {
+                        $text = "Unga order create agiduchu! Payment ah complete panna keela iruka link ah use pannunga: 🛍️";
+                    } else {
+                        $text = "Your order has been created! Use the secure link below to complete your payment: 🛍️";
+                    }
                 }
             } elseif ($toolName === 'kapruka_track_order') {
                 if ($lang === 'si') {
