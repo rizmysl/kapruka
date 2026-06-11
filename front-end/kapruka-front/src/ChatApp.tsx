@@ -283,7 +283,13 @@ export default function ChatApp() {
         return [];
     });
     const [showHistory, setShowHistory] = useState(false);
-    const [useMock, setUseMock] = useState(true);
+    const [useMock, setUseMock] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('kapruka-use-mock');
+            if (saved !== null) return saved === 'true';
+        }
+        return false; // Default to Live API mode for new users
+    });
     const [darkMode, setDarkMode] = useState(() => {
         if (typeof window !== 'undefined') {
             return localStorage.getItem('kapruka-dark') === 'true';
@@ -375,6 +381,11 @@ export default function ChatApp() {
         document.documentElement.classList.toggle('dark', darkMode);
         localStorage.setItem('kapruka-dark', String(darkMode));
     }, [darkMode]);
+
+    useEffect(() => {
+        localStorage.setItem('kapruka-use-mock', String(useMock));
+    }, [useMock]);
+
 
     const sendMessage = async (eOrText: any) => {
         if (eOrText?.preventDefault) eOrText.preventDefault();

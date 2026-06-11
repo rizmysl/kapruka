@@ -609,18 +609,31 @@ class GiftConciergeController extends Controller
         // Extract the clean data payload from the MCP envelope
         $cleanPayload = $this->extractToolPayload($toolResult);
 
+        // Detect language early so we can inject it into the directive
+        $detectedLang = $this->detectLanguage($userMessage);
+        $searchQuery  = $arguments['q'] ?? '';
+
         // Give the LLM a clear hint if the search returned nothing or threw an error
         $llmContextPayload = $cleanPayload;
         if ($toolName === 'kapruka_search_products') {
             $hasNoResults = isset($cleanPayload['results']) && is_array($cleanPayload['results']) && empty($cleanPayload['results']);
             $hasErrorText = isset($cleanPayload['text_content']) && (str_contains(strtolower($cleanPayload['text_content']), 'no products found') || str_contains(strtolower($cleanPayload['text_content']), 'error'));
             
+            $langNote = match($detectedLang) {
+                'singlish' => "IMPORTANT: The user wrote in Singlish. Your ENTIRE response MUST be in natural, warm Singlish (romanised Sinhala + English mix). Do NOT reply in formal English.",
+                'si'       => "IMPORTANT: The user wrote in Sinhala script. Your ENTIRE response MUST be in Sinhala script (සිංහල).",
+                'ta'       => "IMPORTANT: The user wrote in Tamil. Your ENTIRE response MUST be in Tamil script (தமிழ்).",
+                'tanglish' => "IMPORTANT: The user wrote in Tanglish. Your ENTIRE response MUST be in natural Tanglish (Tamil + English mix).",
+                default    => "",
+            };
+
             if ($hasNoResults || $hasErrorText) {
-                $llmContextPayload['_system_directive_'] = "CRITICAL: The search returned ZERO results or an error. You MUST apologize to the user and say you couldn't find any matches. Do NOT say 'Here are your results'.";
+                $llmContextPayload['_system_directive_'] = "CRITICAL: The search returned ZERO results or an error. You MUST apologize to the user and say you couldn't find any matches. Do NOT say 'Here are your results'. {$langNote}";
             } else {
-                $llmContextPayload['_system_directive_'] = "SUCCESS: Products found. Write 1-2 friendly sentences introducing the results.";
+                $llmContextPayload['_system_directive_'] = "SUCCESS: Products found for '{$searchQuery}'. Write 1-2 friendly sentences introducing the results. {$langNote}";
             }
         }
+
 
         Log::info("[Clean Payload for {$toolName}]", ['keys' => array_keys($cleanPayload)]);
 
@@ -697,9 +710,11 @@ class GiftConciergeController extends Controller
             $noResults = ($toolName === 'kapruka_search_products') && (!$hasResults || $hasError);
 
             if ($lang === 'singlish') {
+                // Build a contextual item label from the search query
+                $itemLabel = !empty($arguments['q']) ? ucfirst($arguments['q']) : 'ekata';
                 $text = match(true) {
-                    $toolName === 'kapruka_search_products' && $noResults  => "Aiyo! Sorry anee, mata oya hoyana ekata match wena mukuth hoyaganna bari una. Wena widihakata try karamuda?",
-                    $toolName === 'kapruka_search_products'               => "Ayubowan! 🎁 Kapruka eke thiyena best matches tikak mama oya wenuwen hoyagaththa. Poddak balanna:",
+                    $toolName === 'kapruka_search_products' && $noResults  => "Aiyo! Sorry anee, mata \"{$itemLabel}\" gaena match wena mukuth hoyaganna bari una. Wena widihakata try karamuda? 🙏",
+                    $toolName === 'kapruka_search_products'               => "Menna! 🎁 \"{$itemLabel}\" gaena Kapruka eke thiyena best options tikak mama hoyagaththa. Balannako, mekagen ekak oya wage wena ne? 😊",
                     $toolName === 'kapruka_get_product'                   => "Menna me product eke full details — thawa wisthara one nam Inspector panel eka balanna! ✨",
                     $toolName === 'kapruka_check_delivery'                => "Mama oya wenuwen delivery details check kala — menna mata hambechcha wisthara: 🚚",
                     $toolName === 'kapruka_create_order'                  => "Oyage order eka successfully create una! Payment eka complete karanna me link eka pawichchi karanna: 🛍️",
@@ -707,9 +722,10 @@ class GiftConciergeController extends Controller
                     default                                               => "Menna Kapruka database eken gaththa details:",
                 };
             } else { // tanglish
+                $itemLabel = !empty($arguments['q']) ? ucfirst($arguments['q']) : 'ithai';
                 $text = match(true) {
-                    $toolName === 'kapruka_search_products' && $noResults  => "Aiyo! Sorry, neenga thedura products eduvum kidaikala. Vera perula thedi paarkalama?",
-                    $toolName === 'kapruka_search_products'               => "Vanakkam! 🎁 Kapruka catalog la irunthu ungaluku etha nalla products konjam kandu pudichiruken. Paarunga:",
+                    $toolName === 'kapruka_search_products' && $noResults  => "Aiyo! Sorry, \"{$itemLabel}\" ku match aana products eduvum kidaikala. Vera perula thedi paarkalama? 🙏",
+                    $toolName === 'kapruka_search_products'               => "Paarunga! 🎁 \"{$itemLabel}\" ku Kapruka catalog la irunthu nalla options konjam kandu pudichiruken. Intha list ah parunga! 😊",
                     $toolName === 'kapruka_get_product'                   => "Intha product oda full details itho — innum pakka Inspector panel ah paarunga! ✨",
                     $toolName === 'kapruka_check_delivery'                => "Ungalukkaga delivery options check pannen — itho details: 🚚",
                     $toolName === 'kapruka_create_order'                  => "Unga order create agiduchu! Payment ah complete panna keela iruka link ah use pannunga: 🛍️",
@@ -717,6 +733,7 @@ class GiftConciergeController extends Controller
                     default                                               => "Kapruka database la irunthu details itho:",
                 };
             }
+
         }
 
         // Standardise responses when stripped or default text is returned
@@ -860,8 +877,14 @@ class GiftConciergeController extends Controller
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
                     "🗣️ LANGUAGE & MULTILINGUAL RULES\n" .
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
-                    "You are highly literate in English, Sinhala (සිංහල), and Tamil (தமிழ்):\n" .
-                    "- Detect the user's language immediately. If they type in Sinhala, respond in Sinhala. If they type in Tamil, respond in Tamil. If they use mixed Tanglish/Singlish, respond back with a matching natural, colloquial local tone.\n\n" .
+                    "You are highly literate in English, Sinhala (සිංහල), and Tamil (தமிழ்). Language mirroring is your most important conversational skill:\n" .
+                    "- DETECT THE USER'S LANGUAGE IMMEDIATELY and mirror it throughout your entire response.\n" .
+                    "- If they write in pure Sinhala script (e.g., 'ෆෝන් ඕනේ'), respond FULLY in Sinhala script.\n" .
+                    "- If they write in Singlish (romanised Sinhala mixed with English, e.g., 'mama phone ganna oya', 'sinhalenma denna', 'danna', 'meka epa'), respond in WARM NATURAL SINGLISH — a casual mix of romanised Sinhala + English, NOT formal English.\n" .
+                    "- If they write in Tamil, respond in Tamil. If Tanglish, respond in Tanglish.\n" .
+                    "- CRITICAL: If the user EXPLICITLY asks you to respond in Sinhala or says 'sinhalenma denna' / 'sinhala wala kiyanna' / 'sinhalen katha karanna', you MUST switch your ENTIRE response to Singlish or Sinhala script as requested. Do NOT reply in English in this case. This is a direct language instruction from the user.\n" .
+                    "- When responding in Singlish, make it feel like a real Sri Lankan friend texting you — use words like 'Aiyo!', 'Ane!', 'Nangi', 'Malli', 'Poddak', 'Balanna', 'Hondai ne?', 'Meka try karanko!'. Keep it warm, friendly, and authentic.\n" .
+                    "- When greeting in Singlish/Sinhala context, start with 'Ayubowan! 🙏' or 'Kohomada! 😊' rather than plain 'Hello'.\n\n" .
 
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
                     "📦 ORDER HANDLING & MULTI-ITEM CARTS\n" .
@@ -908,12 +931,28 @@ class GiftConciergeController extends Controller
         }
         
         // Singlish / Tanglish simple heuristic checks
+        // Comprehensive Singlish keyword list — covers common romanised Sinhala words and phrases
         $singlishKeywords = [
-            'koheda', 'puluwanda', 'meka', 'keeyada', 'ganna', 'machan', 'aiyo', 'ane', 'lah', 'epako', 'neda', 'nadda', 'thiyenawada', 'hari', 'elakiri', 'ada', 'heta', 'oya', 'mata', 'pennanna', 'pennanko', 'tikkakui', 'tikak', 'koko', 'naa', 'kohomada', 'moko', 'monawada', 'kiyada'
+            // Classic Singlish markers
+            'koheda', 'puluwanda', 'meka', 'keeyada', 'machan', 'aiyo', 'ane', 'epako', 'neda',
+            'nadda', 'thiyenawada', 'elakiri', 'heta', 'pennanna', 'pennanko', 'tikkakui', 'tikak',
+            'koko', 'kohomada', 'moko', 'monawada', 'kiyada',
+            // Explicit language-switch requests
+            'sinhalenma', 'sinhalenma denna', 'sinhalen', 'sinhala wala', 'sinhala kiyanna',
+            'sinhalata', 'sinhala karanna',
+            // Common Singlish verbs / connectors
+            'denna', 'danna', 'ganna', 'gahanna', 'balanna', 'karanna', 'karala', 'kiyanna',
+            'pennanna', 'hondata', 'honda', 'wage', 'wena', 'thiyena', 'tiyena', 'inne',
+            'hari', 'hadanna', 'hadala', 'yanna', 'enawa', 'yanawa', 'hitiyada',
+            // Common Singlish pronouns / connectors
+            'mama', 'oya', 'mata', 'oyata', 'api', 'apita', 'ewata', 'eka',
+            // Greetings & exclamations
+            'ayubowan', 'kohomada', 'machan', 'nangi', 'malli', 'lah', 'naa',
+            'poddak', 'chuttai', 'epa', 'epaa', 'hadanna', 'hitiyada'
         ];
         foreach ($singlishKeywords as $kw) {
-            if (preg_match('/\b' . preg_quote($kw, '/') . '\b/i', $message)) {
-                return 'singlish'; 
+            if (stripos($message, $kw) !== false) {
+                return 'singlish';
             }
         }
 
