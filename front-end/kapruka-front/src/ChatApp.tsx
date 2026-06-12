@@ -88,6 +88,8 @@ const getSuggestionsForTool = (tool: string | undefined): string[] => {
             return ['📞 Contact support', '🎁 Send another gift', '🔍 Shop for more'];
         case 'kapruka_list_categories':
             return ['🎂 Show Cakes', '💐 Show Flowers', '🍫 Show Chocolates', '🧸 Show Soft Toys'];
+        case 'kapruka_set_reminder':
+            return ['🔍 Find gifts for this event', '🎂 Order a cake', '💐 Browse flowers', '📍 Check delivery options'];
         default:
             return ['🎁 Browse gifts', '📍 Check delivery', '🎂 Birthday ideas', '📦 Track order'];
     }
@@ -225,9 +227,80 @@ export default function ChatApp() {
     const [activePayment, setActivePayment] = useState<any>(null);
     const [iframeLoading, setIframeLoading] = useState(true);
     const [suggestedActions, setSuggestedActions] = useState<string[]>(getSuggestionsForTool(undefined));
+    const [lastSearchContext, setLastSearchContext] = useState<{query?: string; products?: string[]; lastTool?: string}>({});
     const [prefetchedProducts, setPrefetchedProducts] = useState<any[]>([]);
     // Gate the Mock/Live dev toggle behind ?dev=true in URL
     const showDevTools = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('dev') === 'true';
+
+    // ── Reminder State ──
+    const [reminders, setReminders] = useState<Array<{id: string; event_name: string; event_date: string; recipient_relation?: string; created_at: number}>>(() => {
+        try { return JSON.parse(localStorage.getItem('ayla-reminders') || '[]'); } catch { return []; }
+    });
+
+    // Register service worker + check reminders on load
+    useEffect(() => {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/reminder-sw.js').catch(err => {
+                console.warn('[Ayla] SW registration failed:', err);
+            });
+        }
+    }, []);
+
+    // Check reminders daily via the service worker
+    useEffect(() => {
+        if (reminders.length === 0) return;
+        if (!('serviceWorker' in navigator) || !('Notification' in window)) return;
+        if (Notification.permission === 'denied') return;
+
+        const doCheck = () => {
+            navigator.serviceWorker.ready.then(reg => {
+                if (reg.active) {
+                    reg.active.postMessage({ type: 'CHECK_REMINDERS', reminders });
+                }
+            });
+        };
+
+        doCheck();
+        const interval = setInterval(doCheck, 60 * 60 * 1000); // Re-check hourly
+        return () => clearInterval(interval);
+    }, [reminders]);
+
+    // Save a new reminder and request notification permission
+    const saveReminder = (reminderData: {event_name: string; event_date: string; recipient_relation?: string}) => {
+        const newReminder = {
+            id: `reminder_${Date.now()}`,
+            event_name: reminderData.event_name,
+            event_date: reminderData.event_date,
+            recipient_relation: reminderData.recipient_relation,
+            created_at: Date.now()
+        };
+
+        setReminders(prev => {
+            const updated = [...prev, newReminder];
+            localStorage.setItem('ayla-reminders', JSON.stringify(updated));
+            return updated;
+        });
+
+        // Request notification permission if not already granted
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    // Immediately tell SW to check
+                    navigator.serviceWorker.ready.then(reg => {
+                        if (reg.active) {
+                            reg.active.postMessage({ type: 'CHECK_REMINDERS', reminders: [newReminder] });
+                        }
+                    });
+                }
+            });
+        } else if (Notification.permission === 'granted') {
+            navigator.serviceWorker.ready.then(reg => {
+                if (reg.active) {
+                    reg.active.postMessage({ type: 'CHECK_REMINDERS', reminders: [newReminder] });
+                }
+            });
+        }
+    };
 
     // ── Image Upload State ──
     const [attachedImage, setAttachedImage] = useState<string | null>(null);
@@ -515,6 +588,58 @@ export default function ChatApp() {
     }, []);
 
 
+    // ── Smart chip resolver — turns generic chip text into contextual messages ──
+    const resolveChipMessage = (chipText: string): string => {
+        const stripped = chipText.replace(/^[\p{Emoji}\s]+/u, '').trim();
+        const { query, products, lastTool } = lastSearchContext;
+
+        const productList = products && products.length > 0
+            ? `(I already saw: ${products.slice(0, 3).join(', ')})`
+            : '';
+
+        switch (stripped) {
+            case 'Show me something different':
+                return query
+                    ? `Show me different ${query} options, something I haven't seen yet ${productList}. Try a different style, category, or price range.`
+                    : 'Show me something completely different — surprise me with a unique gift idea!';
+
+            case 'Refine search':
+                return query
+                    ? `Help me refine my search for ${query}. What filters or options can we adjust?`
+                    : 'Help me refine my search with better filters.';
+
+            case 'Add to cart & checkout':
+                return products && products.length > 0
+                    ? `I want to buy the ${products[0]}. Help me add it to cart and proceed to checkout.`
+                    : 'Help me add the item to cart and checkout.';
+
+            case 'Add to cart':
+                return products && products.length > 0
+                    ? `Add the ${products[0]} to my cart.`
+                    : 'Add this item to my cart.';
+
+            case 'Check delivery':
+            case 'Check delivery to Colombo':
+                return 'Check delivery availability and cost to Colombo.';
+
+            case 'Proceed to checkout':
+                return 'I am ready to checkout. Please help me place the order.';
+
+            case 'Find similar products':
+                return query
+                    ? `Find me products similar to ${products?.[0] || query} — same style but different options.`
+                    : 'Find me similar products.';
+
+            case 'Find gifts for this event':
+                return query
+                    ? `Find me gifts for ${query}`
+                    : 'Find me gifts for this upcoming event.';
+
+            default:
+                return stripped;
+        }
+    };
+
     const sendMessage = async (eOrText: any) => {
         if (eOrText?.preventDefault) eOrText.preventDefault();
         const userText = typeof eOrText === 'string' ? eOrText : input;
@@ -577,8 +702,28 @@ export default function ChatApp() {
                 setActiveProduct(getParsedData(data.raw_data));
             }
 
-            // Update contextual suggestion chips
+            // 🔔 Save reminder to localStorage + trigger notification permission
+            if (data.tool_called === 'kapruka_set_reminder' && data.raw_data) {
+                const parsed = getParsedData(data.raw_data);
+                if (parsed?.status === 'success' && parsed?.event_name && parsed?.event_date) {
+                    saveReminder({
+                        event_name: parsed.event_name,
+                        event_date: parsed.event_date,
+                        recipient_relation: parsed.recipient_relation
+                    });
+                }
+            }
+
+            // Update contextual suggestion chips + capture last search context
             setSuggestedActions(getSuggestionsForTool(data.tool_called));
+            if (data.tool_called === 'kapruka_search_products' && data.raw_data) {
+                const parsed = getParsedData(data.raw_data);
+                const productNames = (parsed?.results || []).slice(0, 6).map((p: any) => p.name).filter(Boolean);
+                const appliedQuery = parsed?.applied_filters?.q || userText;
+                setLastSearchContext({ query: appliedQuery, products: productNames, lastTool: 'kapruka_search_products' });
+            } else if (data.tool_called) {
+                setLastSearchContext(prev => ({ ...prev, lastTool: data.tool_called }));
+            }
 
             // 🎉 Confetti on successful order creation only
             const isOrderSuccess = data.tool_called === 'kapruka_create_order'
@@ -2016,6 +2161,53 @@ export default function ChatApp() {
                                             </motion.div>
                                         );
                                     })()}
+                                    {/* ── 7. Scheduled Reminder ── */}
+                                    {msg.tool === 'kapruka_set_reminder' && msg.raw_data && (() => {
+                                        const reminderData = getParsedData(msg.raw_data);
+                                        if (reminderData?.status !== 'success') return null;
+                                        return (
+                                            <motion.div 
+                                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                className={`mt-4 mb-2 overflow-hidden rounded-2xl border shadow-sm ${
+                                                    darkMode ? 'bg-dark-card/60 border-brand-purple/30' : 'bg-gradient-to-br from-[#FFF5F7] to-white border-[#7A1C2C]/20'
+                                                }`}
+                                            >
+                                                <div className={`px-4 py-3 border-b flex items-center gap-2 ${
+                                                    darkMode ? 'border-dark-border bg-black/20' : 'border-[#7A1C2C]/10 bg-white/50'
+                                                }`}>
+                                                    <span className="text-xl">⏰</span>
+                                                    <h4 className={`text-sm font-bold m-0 ${darkMode ? 'text-brand-purple-accent' : 'text-[#7A1C2C]'}`}>
+                                                        Reminder Scheduled!
+                                                    </h4>
+                                                </div>
+                                                <div className="p-4 space-y-3">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className={`p-2 rounded-xl flex-shrink-0 ${darkMode ? 'bg-brand-purple/10' : 'bg-[#FDF2F4]'}`}>
+                                                            <span className="text-xl">🎉</span>
+                                                        </div>
+                                                        <div>
+                                                            <p className={`text-xs font-semibold mb-1 tracking-wider ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>EVENT</p>
+                                                            <p className={`text-sm font-bold m-0 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                                                                {reminderData.event_name || 'Special Occasion'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-start gap-3">
+                                                        <div className={`p-2 rounded-xl flex-shrink-0 ${darkMode ? 'bg-brand-purple/10' : 'bg-[#FDF2F4]'}`}>
+                                                            <span className="text-xl">📅</span>
+                                                        </div>
+                                                        <div>
+                                                            <p className={`text-xs font-semibold mb-1 tracking-wider ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>DATE</p>
+                                                            <p className={`text-sm font-bold m-0 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                                                                {reminderData.event_date || 'Upcoming'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    })()}
 
                                     {/* Product Inspector Badge */}
                                     {msg.tool === 'kapruka_get_product' && msg.raw_data && (
@@ -2084,7 +2276,7 @@ export default function ChatApp() {
                                     initial={{ opacity: 0, scale: 0.9 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     transition={{ delay: 0.1 * i }}
-                                    onClick={() => sendMessage(action.replace(/^[\p{Emoji}\s]+/u, '').trim())}
+                                    onClick={() => sendMessage(resolveChipMessage(action))}
                                     className={`px-3.5 py-2 rounded-full text-[11px] font-semibold transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer border ${
                                         darkMode
                                             ? 'bg-dark-card border-dark-border text-dark-muted hover:bg-brand-purple/15 hover:text-brand-purple-accent hover:border-brand-purple/40'

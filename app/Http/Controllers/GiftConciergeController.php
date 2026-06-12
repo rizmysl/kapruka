@@ -297,6 +297,8 @@ class GiftConciergeController extends Controller
     // ... rest of your code remains the same ...
     $result = $llmResponse->json();
     $parts = $result['candidates'][0]['content']['parts'] ?? [];
+    // Also capture the raw model content to forward back (preserves thought_signature)
+    $originalModelContent = $result['candidates'][0]['content'] ?? ['role' => 'model', 'parts' => $parts];
 
     $toolCalls = [];
     foreach ($parts as $part) {
@@ -356,7 +358,7 @@ class GiftConciergeController extends Controller
 
                 // Since we manually extracted and merged it, we can pass $cleanPayloadObj directly. 
                 // finalizeAIResponse handles clean payloads gracefully via the fallback in extractToolPayload.
-                $finalResponse = $this->finalizeAIResponse($userMessage, $history, $toolName, $mergedArguments, $cleanPayloadObj, $imageBase64, $imageMimeType);
+                $finalResponse = $this->finalizeAIResponse($userMessage, $history, $toolName, $mergedArguments, $cleanPayloadObj, $imageBase64, $imageMimeType, $originalModelContent);
                 return response()->json($finalResponse);
             }
         }
@@ -365,7 +367,7 @@ class GiftConciergeController extends Controller
         $toolName = $toolCalls[0]['name'];
         $arguments = $toolCalls[0]['args'] ?? [];
         $toolResult = $this->executeNodeTool($toolName, $arguments);
-        $finalResponse = $this->finalizeAIResponse($userMessage, $history, $toolName, $arguments, $toolResult, $imageBase64, $imageMimeType);
+        $finalResponse = $this->finalizeAIResponse($userMessage, $history, $toolName, $arguments, $toolResult, $imageBase64, $imageMimeType, $originalModelContent);
         return response()->json($finalResponse);
     }
     
@@ -442,6 +444,20 @@ class GiftConciergeController extends Controller
                                 'sort' => ['type' => 'STRING', 'description' => 'Sort order: relevance, price_asc, price_desc, newest, bestseller']
                             ],
                             'required' => ['q']
+                        ]
+                    ],
+                    [
+                        'name' => 'kapruka_set_reminder',
+                        'description' => 'Schedule a reminder for a life event like a birthday, anniversary, or special occasion.',
+                        'parameters' => [
+                            'type' => 'OBJECT',
+                            'properties' => [
+                                'event_name' => ['type' => 'STRING', 'description' => 'Name of the event (e.g. Wife\'s Birthday, Parent\'s Anniversary)'],
+                                'event_date' => ['type' => 'STRING', 'description' => 'Date of the event in YYYY-MM-DD format (e.g. 2026-06-20)'],
+                                'recipient_relation' => ['type' => 'STRING', 'description' => 'Relationship of the recipient to the user (e.g. wife, friend, mother)'],
+                                'gift_ideas' => ['type' => 'STRING', 'description' => 'A short comma-separated list of gift ideas discussed (e.g. Perfume, Red Velvet Cake, Flowers)']
+                            ],
+                            'required' => ['event_name', 'event_date']
                         ]
                     ],
                     [
@@ -544,6 +560,17 @@ class GiftConciergeController extends Controller
      */
     private function executeNodeTool(string $toolName, array $arguments): array
     {
+        // Mock the reminder tool for the hackathon since there's no real DB attached
+        if ($toolName === 'kapruka_set_reminder') {
+            return [
+                'status' => 'success',
+                'message' => 'Reminder scheduled successfully.',
+                'event_name' => $arguments['event_name'] ?? 'Special Event',
+                'event_date' => $arguments['event_date'] ?? 'Unknown Date',
+                'recipient_relation' => $arguments['recipient_relation'] ?? 'friend'
+            ];
+        }
+
         try {
             // Force JSON response format for all tool executions to standardise visual card data
             $arguments['response_format'] = 'json';
@@ -621,7 +648,7 @@ class GiftConciergeController extends Controller
     /**
      * Send the tool output back to the LLM to get a natural language conclusion
      */
-    private function finalizeAIResponse(string $userMessage, array $history, string $toolName, array $arguments, array $toolResult, ?string $imageBase64 = null, ?string $imageMimeType = null): array
+    private function finalizeAIResponse(string $userMessage, array $history, string $toolName, array $arguments, array $toolResult, ?string $imageBase64 = null, ?string $imageMimeType = null, array $originalModelContent = []): array
     {
         // Extract the clean data payload from the MCP envelope
         $cleanPayload = $this->extractToolPayload($toolResult);
@@ -665,9 +692,9 @@ class GiftConciergeController extends Controller
             if ($hasNoResults || $hasErrorText) {
                 $llmContextPayload['_system_directive_'] = "CRITICAL: The search returned ZERO results or an error. You MUST apologize to the user and say you couldn't find any matches. Do NOT say 'Here are your results'. {$langNote}";
             } elseif ($isEmotional) {
-                $llmContextPayload['_system_directive_'] = "EMOTIONAL CONTEXT DETECTED in user message: '{$userMessage}'. The user seems stressed, worried, or in a difficult situation. You MUST: 1) Start with a warm, empathetic acknowledgement of their feeling (1 sentence — e.g., 'Aiyo, don't worry!' or 'Ane, no stress!'). 2) Reassure them Kapruka has them covered. 3) Then in 1 sentence introduce the results. Keep it warm and human. {$langNote}";
+                $llmContextPayload['_system_directive_'] = "EMOTIONAL CONTEXT DETECTED in user message: '{$userMessage}'. The user seems stressed, worried, or in a difficult situation. You MUST: 1) Start with a warm, empathetic acknowledgement of their feeling (1 sentence — e.g., 'Aiyo, don't worry!' or 'Ane, no stress!'). 2) Reassure them Kapruka has them covered. 3) Then in 1 sentence introduce the results. 4) ONLY if they mentioned an upcoming special event (birthday, anniversary) — and you have NOT already collected delivery/order details — you may offer to set a reminder. {$langNote}";
             } else {
-                $llmContextPayload['_system_directive_'] = "SUCCESS: Products found for '{$searchQuery}'. Write 1-2 friendly, warm sentences introducing the results. Do NOT just say 'Here are your results' — add a personal touch. {$langNote}";
+                $llmContextPayload['_system_directive_'] = "SUCCESS: Products found for '{$searchQuery}'. Write 1-2 friendly, warm sentences introducing the results. Do NOT just say 'Here are your results' — add a personal touch. ONLY mention setting a reminder if the user is at the very START of their shopping journey and hasn't begun checkout yet. {$langNote}";
             }
         }
 
@@ -685,9 +712,9 @@ class GiftConciergeController extends Controller
 
             if ($hasOrderError) {
                 $errorDetail = $orderError ?? $orderErrorText ?? 'unknown error';
-                $llmContextPayload['_system_directive_'] = "CRITICAL ERROR: The order creation FAILED with error: '{$errorDetail}'. You MUST tell the user their order could NOT be placed, apologize, and suggest they try again in a moment. Do NOT say 'Your order has been created'. {$langNote}";
+                $llmContextPayload['_system_directive_'] = "CRITICAL ERROR: The order creation FAILED with error: '{$errorDetail}'. You MUST tell the user their order could NOT be placed, apologize, and suggest they try again in a moment. Do NOT say 'Your order has been created'. Do NOT use kapruka_set_reminder. {$langNote}";
             } else {
-                $llmContextPayload['_system_directive_'] = "SUCCESS: The order was created successfully. Briefly confirm the order was placed and remind them to complete payment. {$langNote}";
+                $llmContextPayload['_system_directive_'] = "SUCCESS: The order was created successfully. Briefly confirm the order was placed and remind them to complete payment. Do NOT use kapruka_set_reminder — this is a purchase completion, not a reminder event. {$langNote}";
             }
         }
 
@@ -713,16 +740,16 @@ class GiftConciergeController extends Controller
         }
         $contents[] = ['role' => 'user', 'parts' => $userParts];
         
-        // 1. Insert the preceding model's functionCall turn
-        $contents[] = [
-            'role' => 'model',
-            'parts' => [[
-                'functionCall' => [
-                    'name' => $toolName,
-                    'args' => $arguments
-                ]
-            ]]
-        ];
+        // 1. Insert the preceding model's functionCall turn verbatim (preserving thought_signature)
+        if (!empty($originalModelContent)) {
+            $contents[] = $originalModelContent;
+        } else {
+            // Fallback if no original content captured
+            $contents[] = [
+                'role' => 'model',
+                'parts' => [['functionCall' => ['name' => $toolName, 'args' => $arguments]]]
+            ];
+        }
 
         // 2. Insert the functionResponse turn — use the context payload with directives
         $contents[] = [
@@ -743,7 +770,10 @@ class GiftConciergeController extends Controller
             'systemInstruction' => $this->getSystemInstruction()
         ]);
 
-        $text = $llmResponse->json()['candidates'][0]['content']['parts'][0]['text'] ?? 'Here are your results.';
+        $rawResponse = $llmResponse->json();
+        Log::info('[Gemini Raw Second Turn]', ['response' => $rawResponse]);
+        
+        $text = $rawResponse['candidates'][0]['content']['parts'][0]['text'] ?? 'Here are your results.';
 
         // Aggressively strip any raw JSON that the model might still echo
         // Pattern 1: Remove markdown codeblocks containing JSON
@@ -858,6 +888,18 @@ class GiftConciergeController extends Controller
                             $text = "🎁 Here's what I found on Kapruka for you:";
                         }
                     }
+                }
+            } elseif ($toolName === 'kapruka_set_reminder') {
+                if ($lang === 'si') {
+                    $text = "මෙන්න ඔබේ මතක්කිරීම සාර්ථකව පිහිටුවා ඇත! ⏰ මම ඔබට නියමිත දිනට මතක් කරන්නම්.";
+                } elseif ($lang === 'ta') {
+                    $text = "உங்கள் நினைவூட்டல் வெற்றிகரமாக அமைக்கப்பட்டது! ⏰ சரியான நேரத்தில் நான் உங்களுக்கு நினைவூட்டுகிறேன்.";
+                } elseif ($lang === 'singlish') {
+                    $text = "Oyaage reminder eka set kala! ⏰ Welawata mama mathak karannam.";
+                } elseif ($lang === 'tanglish') {
+                    $text = "Unga reminder set panniyachi! ⏰ Correct time ku naan remind panren.";
+                } else {
+                    $text = "I've successfully scheduled that reminder for you! ⏰ I'll make sure you don't forget.";
                 }
             } elseif ($toolName === 'kapruka_get_product') {
                 if ($lang === 'si') {
@@ -986,6 +1028,7 @@ class GiftConciergeController extends Controller
                     "- Act as a personal AI companion. Engage in supportive conversations about daily life, relationships, stress, work, planning, and personal challenges.\n" .
                     "- When users share frustrations or personal concerns, respond with empathy and understanding. Acknowledge emotions without judgment. Encourage constructive actions and healthy communication. Avoid taking sides in personal disputes. NEVER provide harmful, manipulative, or unsafe advice.\n" .
                     "- Prioritize helping the user emotionally or organizationally FIRST. Then, when appropriate and genuinely relevant, suggest products, services, reminders, or actions that help solve their problem.\n" .
+                    "- REMINDERS: ONLY use `kapruka_set_reminder` when a user EXPLICITLY and directly asks you to set a reminder (e.g., 'yes set a reminder', 'please remind me'). Do NOT call this tool during an active order or checkout flow (i.e., when you are collecting delivery address, sender name, or payment info). Delivery dates are NOT event dates. Only offer a reminder proactively at the START of a conversation when a user first mentions an upcoming event — NEVER in the middle of an order.\n" .
                     "- The transition from conversation to commerce should feel natural and helpful rather than promotional. Recommendations should be presented as solutions to the user's needs, not advertisements. For example, if a user is stressed about an upcoming anniversary, offer empathetic support, then suggest relevant gifts, flowers, cakes, or experiences to relieve their stress.\n" .
                     "- Do not sound like a robotic search box. Read the user's emotional situation.\n" .
                     "- Naturally weave in light local flavor and colloquialisms when appropriate (e.g., using words like \"Aiyo!\", \"Ane\", \"Nangi/Malli\" (if addressing playfully), \"Chuttai\", or blending conversational Singlish/Tanglish). Since Ayla is female, she should use terms fitting for a friendly Sri Lankan girl.\n" .
