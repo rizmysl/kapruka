@@ -844,10 +844,19 @@ class GiftConciergeController extends Controller
                     }
                 } else {
                     // Let the LLM-generated text stand — it already has the emotional context.
-                    // Don't override with a canned cold phrase here.
-                    if (empty($text)) {
-                        // Absolute last-resort fallback only if LLM returned nothing at all
-                        $text = "🎁 Here's what I found on Kapruka for you:";
+                    // But if it defaulted to the english fallback or is empty, provide a localized fallback!
+                    if (empty($text) || strlen($text) < 10 || str_starts_with(strtolower($text), 'here are your results') || $text === 'Here are your results.') {
+                        if ($lang === 'si') {
+                            $text = "🎁 ඔබට ගැලපෙන දේවල් කිහිපයක් මෙන්න:";
+                        } elseif ($lang === 'ta') {
+                            $text = "🎁 உங்களுக்கான சில சிறந்த தேர்வுகள் இதோ:";
+                        } elseif ($lang === 'singlish') {
+                            $text = "🎁 Oya hoyapu badu tikak menna:";
+                        } elseif ($lang === 'tanglish') {
+                            $text = "🎁 Neenga thedina items itho:";
+                        } else {
+                            $text = "🎁 Here's what I found on Kapruka for you:";
+                        }
                     }
                 }
             } elseif ($toolName === 'kapruka_get_product') {

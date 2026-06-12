@@ -1189,8 +1189,16 @@ export default function ChatApp() {
                                 <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="relative flex flex-col items-center gap-6 w-full max-w-5xl px-4 py-8">
                                     
                                     {/* Center: Text & Actions */}
-                                    <div className="flex flex-col items-center text-center gap-5 z-10">
-                                        <p className="text-brand-purple dark:text-brand-purple-accent text-xs font-bold uppercase tracking-[0.25em] bg-brand-purple/10 px-4 py-1.5 rounded-full border border-brand-purple/20 backdrop-blur-md">
+                                    <AnimatePresence mode="wait">
+                                    <motion.div 
+                                        key={currentLang}
+                                        initial={{ opacity: 0, y: 5 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -5 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="flex flex-col items-center text-center gap-2 z-10"
+                                    >
+                                        <p className="text-brand-purple dark:text-brand-purple-accent text-xs font-bold uppercase tracking-[0.25em] bg-brand-purple/10 px-4 py-1.5 rounded-full border border-brand-purple/20 backdrop-blur-md mb-2">
                                             {translations[currentLang].heroSub}
                                         </p>
                                         <h2 className={`text-4xl sm:text-5xl md:text-7xl font-serif font-black tracking-tighter leading-[1] max-w-4xl bg-clip-text text-transparent pb-2 drop-shadow-sm ${darkMode ? 'bg-gradient-to-br from-white via-gray-300 to-gray-500' : 'bg-gradient-to-br from-gray-900 via-gray-700 to-gray-500'}`}>
@@ -1243,7 +1251,8 @@ export default function ChatApp() {
                                                 <span className="text-[10px] opacity-70">🎁</span> <span>5,000+ DELIVERED</span>
                                             </div>
                                         </div>
-                                    </div>
+                                    </motion.div>
+                                    </AnimatePresence>
 
                                 </motion.div>
 
@@ -2087,6 +2096,8 @@ export default function ChatApp() {
                             ))}
                         </motion.div>
                     )}
+                    {/* Invisible spacer to give the last message breathing room so it's not flush with the input box */}
+                    <div className="h-12 md:h-16 shrink-0" />
                     <div ref={messagesEndRef} />
                 </div>
                 </>
