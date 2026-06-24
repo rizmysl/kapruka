@@ -86,18 +86,28 @@ body {
   border-color: rgba(255, 255, 255, 0.08);
 }
 
-/* ─── Gradient Text ─── */
+/* ─── Luminous Candy Text ─── */
 .gradient-text {
-  background: linear-gradient(135deg, #402970, #6A4C9C, #A17BD9);
+  background: linear-gradient(135deg, #00FFFF, #FF69B4, #FF1493, #00FFFF);
+  background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 12px rgba(255, 105, 180, 0.6), 0 0 24px rgba(0, 255, 255, 0.4);
+  animation: candy-shimmer 4s infinite linear;
 }
 .dark .gradient-text {
-  background: linear-gradient(135deg, #A17BD9, #C8A2C8, #E6E6FA);
+  background: linear-gradient(135deg, #00FFFF, #FF69B4, #FF1493, #00FFFF);
+  background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 12px rgba(255, 105, 180, 0.6), 0 0 24px rgba(0, 255, 255, 0.4);
+  animation: candy-shimmer 4s infinite linear;
+}
+
+@keyframes candy-shimmer {
+  to { background-position: 200% center; }
 }
 
 /* ─── Focus Glow Ring ─── */
@@ -153,4 +163,97 @@ body {
 .mobile-sidebar-transition {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
               opacity 0.3s ease;
+}
+
+/* ─── Neumorphism / Embossed Plastic Utilities ─── */
+.neu-bubble {
+  box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.08), -4px -4px 10px rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+.dark .neu-bubble {
+  box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.5), -4px -4px 12px rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.neu-input {
+  box-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.06), inset -4px -4px 8px rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255,255,255,0.3);
+}
+.dark .neu-input {
+  box-shadow: inset 4px 4px 10px rgba(0, 0, 0, 0.4), inset -4px -4px 10px rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+}
+
+.neu-button {
+  box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.08), -3px -3px 6px rgba(255, 255, 255, 0.9);
+}
+.neu-button:active {
+  box-shadow: inset 3px 3px 6px rgba(0, 0, 0, 0.08), inset -3px -3px 6px rgba(255, 255, 255, 0.9);
+}
+.dark .neu-button {
+  box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.5), -3px -3px 8px rgba(255, 255, 255, 0.04);
+}
+.dark .neu-button:active {
+  box-shadow: inset 3px 3px 8px rgba(0, 0, 0, 0.5), inset -3px -3px 8px rgba(255, 255, 255, 0.04);
+}
+
+/* ─── Chewing Gum Feel Utilities ─── */
+.gum-control {
+  border-radius: 9999px; /* Maximum rounding */
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.8), rgba(240, 240, 240, 0.2));
+  box-shadow: 
+    3px 3px 8px rgba(0, 0, 0, 0.15), 
+    -3px -3px 8px rgba(255, 255, 255, 0.8),
+    inset 3px 3px 5px rgba(255, 255, 255, 1),
+    inset -3px -3px 5px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s cubic-bezier(0.68, -0.6, 0.32, 1.6); /* Bouncy stretch effect */
+}
+.dark .gum-control {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.2));
+  box-shadow: 
+    4px 4px 10px rgba(0, 0, 0, 0.6), 
+    -2px -2px 6px rgba(255, 255, 255, 0.04),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.05),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.4);
+}
+.gum-control:active {
+  transform: scale(0.9) translateY(2px);
+  background: rgba(240, 240, 240, 0.6);
+  box-shadow: 
+    inset 5px 5px 10px rgba(0, 0, 0, 0.15), 
+    inset -5px -5px 10px rgba(255, 255, 255, 0.8);
+}
+.dark .gum-control:active {
+  background: rgba(0, 0, 0, 0.2);
+  box-shadow: 
+    inset 5px 5px 10px rgba(0, 0, 0, 0.6), 
+    inset -5px -5px 10px rgba(255, 255, 255, 0.02);
+}
+
+/* ─── Candy Feeling Chat Bubbles ─── */
+.candy-bubble {
+  background: linear-gradient(135deg, rgba(255, 182, 193, 0.95), rgba(253, 226, 230, 0.95)); /* Soft cotton candy pink */
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 32px 0 rgba(255, 105, 180, 0.2), inset 0 2px 5px rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  color: #402970;
+}
+.dark .candy-bubble {
+  background: linear-gradient(135deg, rgba(255, 105, 180, 0.15), rgba(147, 112, 219, 0.15));
+  border: 1px solid rgba(255, 182, 193, 0.2);
+  color: #FFD1DC;
+  box-shadow: 0 4px 16px rgba(255, 105, 180, 0.1);
+}
+
+.candy-user-bubble {
+  background: linear-gradient(135deg, #40E0D0, #00BFFF); /* Vibrant Turquoise/Cyan */
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 24px 0 rgba(0, 255, 255, 0.3), inset 0 2px 5px rgba(255, 255, 255, 0.6);
+  color: #002F6C;
+}
+.dark .candy-user-bubble {
+  background: linear-gradient(135deg, rgba(64, 224, 208, 0.25), rgba(0, 191, 255, 0.25));
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  color: #E0FFFF;
+  box-shadow: 0 4px 16px rgba(0, 255, 255, 0.15);
 }

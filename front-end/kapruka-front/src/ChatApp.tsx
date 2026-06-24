@@ -11,6 +11,8 @@ import {
   AttachmentIcon, MicrophoneIcon
 } from './components/icons';
 
+import aylaAvatar from './assets/ayla_avatar.png';
+
 interface RawData {
   id?: string;
   name?: string;
@@ -28,6 +30,7 @@ interface Message {
   tool?: string;
   raw_data?: RawData;
   image?: string;
+  timestamp?: number;
 }
 
 interface ChatSession {
@@ -37,7 +40,7 @@ interface ChatSession {
   createdAt: number;
 }
 
-const shoppingPattern = `url('data:image/svg+xml;utf8,<svg width="150" height="150" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 20 30 h 20 v 20 h -20 z"/><path d="M 30 30 v 20"/><path d="M 20 40 h 20"/><path d="M 30 30 c -4 -6 -10 -2 -5 2 c 5 4 5 -2 5 -2"/><path d="M 30 30 c 4 -6 10 -2 5 2 c -5 4 -5 -2 -5 -2"/><path d="M 100 25 c -3 -3 -8 -3 -11 0 c -2 2 -3 5 -2 8 c 2 6 13 15 13 15 s 11 -9 13 -15 c 1 -3 0 -6 -2 -8 c -3 -3 -8 -3 -11 0 z" fill="black"/><path d="M 25 100 h 16 l 2 20 h -20 z"/><path d="M 29 100 a 4 4 0 0 1 8 0"/><path d="M 105 110 c -5 -5 0 -12 5 -7 c 5 -5 12 0 7 5 c 5 5 0 12 -5 7 c -5 5 -12 0 -7 -5 z"/><circle cx="110" cy="115" r="2" fill="black"/><path d="M 60 20 l 2 6 l 6 2 l -6 2 l -2 6 l -2 -6 l -6 -2 l 6 -2 z" fill="black" stroke="none"/><path d="M 55 80 l 10 0 l -2 10 l -6 0 z"/><path d="M 53 80 c 0 -8 14 -8 14 0" fill="black"/><circle cx="60" cy="70" r="1.5" fill="black" stroke="none"/><path d="M 125 65 c -5 -5 -10 5 0 5 c 10 -5 5 -15 0 -5 z"/><path d="M 80 120 c 5 -10 15 -10 10 0 c -2 5 -8 5 -10 0 z"/><path d="M 85 122 v 10"/><path d="M 130 90 c -2 0 -4 -2 -4 -4 v -10 c 0 -2 2 -4 4 -4 h 10 c 2 0 4 2 4 4 v 10 c 0 2 -2 4 -4 4 z"/><path d="M 135 80 l -5 10"/><path d="M 40 130 c -2 -2 -5 -2 -7 0 c -2 2 -2 5 0 7 c 2 2 5 2 7 0 c 2 -2 2 -5 0 -7 z"/><path d="M 15 65 h 5 v 5 h -5 z" fill="black"/></svg>')`;
+const techPattern = `url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="20" r="2" fill="black"/><circle cx="80" cy="30" r="3" fill="black"/><circle cx="40" cy="80" r="2" fill="black"/><circle cx="70" cy="90" r="1.5" fill="black"/><path d="M20 20 L80 30 L40 80 Z" fill="none" stroke="black" stroke-width="0.5" stroke-dasharray="2,2"/><path d="M20 20 L40 80" fill="none" stroke="black" stroke-width="0.5"/><path d="M80 30 L70 90 L40 80" fill="none" stroke="black" stroke-width="0.5"/><path d="M0 50 L20 20 M100 50 L80 30 M50 100 L40 80 M50 0 L80 30" fill="none" stroke="black" stroke-width="0.2"/></svg>')`;
 
 import { translations } from './translations';
 
@@ -68,7 +71,8 @@ const getInitialWelcomeMsg = (): Message => {
     const occasionLine = occasion ? `\n\n✨ *${occasion}* — perfect time to send something special!` : '';
     return {
         role: 'bot',
-        text: `${getDynamicGreeting()} I'm **Ayla**, your Kapruka AI Gift Concierge — powered by Gemini & MCP. 🎁${occasionLine}\n\nTell me who you're shopping for and I'll find the perfect gift!`
+        text: `${getDynamicGreeting()} I'm **Ayla**, your Kapruka AI Gift Concierge — powered by Gemini & MCP. 🎁${occasionLine}\n\nTell me who you're shopping for and I'll find the perfect gift!`,
+        timestamp: Date.now()
     };
 };
 
@@ -109,6 +113,11 @@ export default function ChatApp() {
         }
         return [initial];
     });
+
+    const formatMessageTime = (timestamp?: number) => {
+        if (!timestamp) return '';
+        return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(timestamp));
+    };
     const [activeSessionId, setActiveSessionId] = useState<string>(() => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('kapruka-sessions');
@@ -326,7 +335,7 @@ export default function ChatApp() {
     // ── Voice Input State ──
     const [isRecording, setIsRecording] = useState(false);
     const recognitionRef = useRef<any>(null);
-
+    const [liveTranscript, setLiveTranscript] = useState('');
     // Initialize Web Speech API
     const sendMessageRef = useRef<any>(null);
 
@@ -335,37 +344,47 @@ export default function ChatApp() {
             const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
             recognitionRef.current = new SpeechRecognition();
             recognitionRef.current.continuous = true;
-            recognitionRef.current.interimResults = false;
+            recognitionRef.current.interimResults = true;
             
             let silenceTimer: any = null;
             let accumulatedTranscript = '';
+            let isSending = false;
 
             recognitionRef.current.onstart = () => {
                 setIsRecording(true);
                 accumulatedTranscript = '';
+                setLiveTranscript('');
+                isSending = false;
             };
             
             recognitionRef.current.onresult = (event: any) => {
+                if (isSending) return;
+                
+                let currentInterim = '';
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
                     if (event.results[i].isFinal) {
                         accumulatedTranscript += event.results[i][0].transcript + ' ';
+                    } else {
+                        currentInterim += event.results[i][0].transcript;
                     }
                 }
                 
-                // Clear previous timer and set a new one for 2.5 seconds (increased pause delay)
+                const fullText = (accumulatedTranscript + currentInterim).trim();
+                setLiveTranscript(fullText);
+                
                 if (silenceTimer) clearTimeout(silenceTimer);
                 
                 silenceTimer = setTimeout(() => {
-                    const finalStr = accumulatedTranscript.trim();
-                    if (finalStr && sendMessageRef.current) {
-                        sendMessageRef.current(finalStr);
+                    if (fullText && sendMessageRef.current) {
+                        isSending = true;
+                        sendMessageRef.current(fullText);
                         accumulatedTranscript = '';
-                        // Auto stop recognition after sending
+                        setLiveTranscript('');
                         if (recognitionRef.current) {
                             recognitionRef.current.stop();
                         }
                     }
-                }, 2500);
+                }, 2000); // 2 second pause is perfect for auto-send
             };
             
             recognitionRef.current.onerror = (event: any) => {
@@ -383,8 +402,9 @@ export default function ChatApp() {
     // Update recognition language
     useEffect(() => {
         if (recognitionRef.current) {
-            const langMap = { en: 'en-US', si: 'si-LK', ta: 'ta-LK' };
-            recognitionRef.current.lang = langMap[currentLang as keyof typeof langMap] || 'en-US';
+            // Use en-LK instead of en-US to better handle local accents and Singlish loanwords
+            const langMap = { en: 'en-LK', si: 'si-LK', ta: 'ta-LK' };
+            recognitionRef.current.lang = langMap[currentLang as keyof typeof langMap] || 'en-LK';
         }
     }, [currentLang]);
 
@@ -591,7 +611,7 @@ export default function ChatApp() {
     // ── Smart chip resolver — turns generic chip text into contextual messages ──
     const resolveChipMessage = (chipText: string): string => {
         const stripped = chipText.replace(/^[\p{Emoji}\s]+/u, '').trim();
-        const { query, products, lastTool } = lastSearchContext;
+        const { query, products } = lastSearchContext;
 
         const productList = products && products.length > 0
             ? `(I already saw: ${products.slice(0, 3).join(', ')})`
@@ -654,7 +674,7 @@ export default function ChatApp() {
         setAttachedImage(null);
         setAttachedImageMime(null);
 
-        const updatedMessages = [...messages, { role: 'user' as const, text: userText, image: currentImage || undefined }];
+        const updatedMessages = [...messages, { role: 'user' as const, text: userText, image: currentImage || undefined, timestamp: Date.now() }];
         setMessages(updatedMessages);
         setIsLoading(true);
 
@@ -695,7 +715,8 @@ export default function ChatApp() {
                 role: 'bot', 
                 text: data.text || "Sorry, I didn't receive a valid text response.", 
                 tool: data.tool_called, 
-                raw_data: data.raw_data
+                raw_data: data.raw_data,
+                timestamp: Date.now()
             }]);
             
             if (data.tool_called === 'kapruka_get_product' && data.raw_data) {
@@ -772,7 +793,7 @@ export default function ChatApp() {
             } ${
                 darkMode
                     ? 'bg-dark-surface/80 backdrop-blur-xl border-dark-border'
-                    : 'bg-gradient-to-b from-[#002F6C] to-[#001845] shadow-2xl border-white/10'
+                    : 'bg-gradient-to-b from-[#251845]/90 via-[#190f30]/95 to-[#0e071c] shadow-2xl border-r border-white/15 backdrop-blur-2xl'
             } fixed md:relative inset-y-0 left-0 w-72 md:flex ${
                 mobileSidebarOpen ? 'flex translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
             } md:!transform-none`}>
@@ -782,9 +803,9 @@ export default function ChatApp() {
                         <div>
                             <h1 className="text-2xl font-black tracking-tight flex items-center gap-1">
                                 <span className="gradient-text">K</span>
-                                <span className="text-white">apruka</span>
+                                <span className="text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]">apruka</span>
                             </h1>
-                            <p className={`text-[10px] mt-1 font-semibold tracking-[0.2em] uppercase ${darkMode ? 'text-dark-muted' : 'text-white/50'}`}>
+                            <p className={`text-[10px] mt-1 font-bold tracking-[0.2em] uppercase ${darkMode ? 'text-dark-muted' : 'text-cyan-300/80 drop-shadow-[0_0_6px_rgba(0,255,255,0.3)]'}`}>
                                 Ayla · AI Concierge
                             </p>
                         </div>
@@ -798,7 +819,7 @@ export default function ChatApp() {
                         <button
                             onClick={() => { setMobileSidebarOpen(false); }}
                             className={`p-1.5 rounded-lg transition-colors cursor-pointer md:hidden ${
-                                darkMode ? 'text-dark-muted hover:bg-white/5 hover:text-dark-text' : 'text-white/60 hover:bg-white/10 hover:text-white'
+                                darkMode ? 'text-dark-muted hover:bg-white/5 hover:text-dark-text' : 'text-pink-300 hover:bg-white/10 hover:text-white'
                             }`}
                         >
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -807,7 +828,7 @@ export default function ChatApp() {
                         <button 
                             onClick={() => setSidebarCollapsed(!sidebarCollapsed)} 
                             className={`p-1.5 rounded-lg transition-colors cursor-pointer hidden md:block ${
-                                darkMode ? 'text-dark-muted hover:bg-white/5 hover:text-dark-text' : 'text-white/60 hover:bg-white/10 hover:text-white'
+                                darkMode ? 'text-dark-muted hover:bg-white/5 hover:text-dark-text' : 'text-pink-300 hover:bg-white/10 hover:text-white'
                             }`}
                         >
                             <SidebarIcon />
@@ -818,12 +839,12 @@ export default function ChatApp() {
                 <div className="px-3 mt-4 flex justify-center">
                     <button
                         onClick={startNewChat}
-                        className={`flex items-center justify-center gap-2 rounded-xl text-xs font-bold transition-all duration-200 border cursor-pointer ${
+                        className={`flex items-center justify-center gap-2 rounded-xl text-xs font-extrabold transition-all duration-300 border cursor-pointer active:scale-95 ${
                             sidebarCollapsed ? 'p-2.5' : 'w-full px-4 py-2.5'
                         } ${
                             darkMode
                                 ? 'bg-brand-purple/15 border-brand-purple/30 text-brand-purple-accent hover:bg-brand-purple/25'
-                                : 'bg-white/15 border-white/30 text-white hover:bg-white/25'
+                                : 'bg-gradient-to-r from-pink-500/80 via-fuchsia-500/80 to-purple-600/80 border-white/30 text-white shadow-[0_4px_15px_rgba(236,72,153,0.3)] hover:shadow-[0_4px_20px_rgba(236,72,153,0.45)] hover:from-pink-500 hover:to-purple-600'
                         }`}
                         title={sidebarCollapsed ? "New Chat" : undefined}
                     >
@@ -834,12 +855,12 @@ export default function ChatApp() {
 
                 <nav className="px-3 mt-4 space-y-1">
                     <button onClick={() => { setShowHelp(false); setShowHistory(false); setActiveProduct(null); setActivePayment(null); setMobileSidebarOpen(false); }}
-                        className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                        className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 cursor-pointer ${
                             sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full px-4 text-left'
                         } ${
                             !showHelp && !showHistory && !activeProduct && !activePayment
-                                ? darkMode ? 'bg-brand-purple/10 text-brand-purple-accent' : 'bg-white/10 text-white'
-                                : darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
+                                ? darkMode ? 'bg-brand-purple/20 border border-brand-purple-accent/35 text-brand-purple-accent shadow-[0_0_12px_rgba(168,85,247,0.15)]' : 'bg-white/15 border border-white/25 text-white shadow-[0_0_12px_rgba(255,255,255,0.05)]'
+                                : darkMode ? 'text-dark-muted hover:bg-white/5 hover:text-dark-text border border-transparent' : 'text-white/70 hover:bg-white/10 hover:text-white border border-transparent hover:border-white/10'
                         }`}
                         title={sidebarCollapsed ? "Active Chat" : undefined}
                     >
@@ -847,12 +868,12 @@ export default function ChatApp() {
                         {!sidebarCollapsed && "Active Chat"}
                     </button>
                     <button onClick={() => { setShowHelp(true); setShowHistory(false); setActiveProduct(null); setActivePayment(null); setMobileSidebarOpen(false); }}
-                        className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
+                        className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 cursor-pointer ${
                             sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full px-4 text-left'
                         } ${
                             showHelp
-                                ? darkMode ? 'bg-brand-purple/10 text-brand-purple-accent' : 'bg-white/10 text-white'
-                                : darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
+                                ? darkMode ? 'bg-brand-purple/20 border border-brand-purple-accent/35 text-brand-purple-accent shadow-[0_0_12px_rgba(168,85,247,0.15)]' : 'bg-white/15 border border-white/25 text-white shadow-[0_0_12px_rgba(255,255,255,0.05)]'
+                                : darkMode ? 'text-dark-muted hover:bg-white/5 hover:text-dark-text border border-transparent' : 'text-white/70 hover:bg-white/10 hover:text-white border border-transparent hover:border-white/10'
                         }`}
                         title={sidebarCollapsed ? "How to Use" : undefined}
                     >
@@ -860,12 +881,12 @@ export default function ChatApp() {
                         {!sidebarCollapsed && "How to Use"}
                     </button>
                     <button onClick={() => { setShowHelp(false); setShowHistory(true); setActiveProduct(null); setActivePayment(null); setMobileSidebarOpen(false); }}
-                        className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
+                        className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 cursor-pointer ${
                             sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full px-4 text-left'
                         } ${
                             showHistory
-                                ? darkMode ? 'bg-brand-purple/10 text-brand-purple-accent' : 'bg-white/10 text-white'
-                                : darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
+                                ? darkMode ? 'bg-brand-purple/20 border border-brand-purple-accent/35 text-brand-purple-accent shadow-[0_0_12px_rgba(168,85,247,0.15)]' : 'bg-white/15 border border-white/25 text-white shadow-[0_0_12px_rgba(255,255,255,0.05)]'
+                                : darkMode ? 'text-dark-muted hover:bg-white/5 hover:text-dark-text border border-transparent' : 'text-white/70 hover:bg-white/10 hover:text-white border border-transparent hover:border-white/10'
                         }`}
                         title={sidebarCollapsed ? "Order History" : undefined}
                     >
@@ -873,10 +894,10 @@ export default function ChatApp() {
                         {!sidebarCollapsed && "Order History"}
                     </button>
                     <button onClick={() => { setShowHelp(false); setShowHistory(false); setActiveProduct(null); setActivePayment(null); setMobileSidebarOpen(false); sendMessage("Show me all categories"); }}
-                        className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
+                        className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 cursor-pointer ${
                             sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full px-4 text-left'
                         } ${
-                            darkMode ? 'text-dark-muted hover:bg-white/5' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
+                            darkMode ? 'text-dark-muted hover:bg-white/5 hover:text-dark-text border border-transparent' : 'text-white/70 hover:bg-white/10 hover:text-white border border-transparent hover:border-white/10'
                         }`}
                         title={sidebarCollapsed ? "Categories" : undefined}
                     >
@@ -888,7 +909,7 @@ export default function ChatApp() {
                 {/* Chat Session History */}
                 <div className="flex-1 overflow-y-auto px-3 mt-4 min-h-0 hide-scrollbar">
                     {!sidebarCollapsed && (
-                        <p className={`text-[9px] font-bold tracking-[0.2em] uppercase px-1 mb-2 ${darkMode ? 'text-dark-muted' : 'text-white/40'}`}>
+                        <p className={`text-[9px] font-extrabold tracking-[0.25em] uppercase px-1 mb-2 ${darkMode ? 'text-dark-muted' : 'text-cyan-300 drop-shadow-[0_0_6px_rgba(0,255,255,0.3)]'}`}>
                             Chat History
                         </p>
                     )}
@@ -897,43 +918,43 @@ export default function ChatApp() {
                             <div
                                 key={session.id}
                                 onClick={() => switchSession(session.id)}
-                                className={`flex items-center rounded-xl transition-all duration-200 group cursor-pointer ${
-                                    sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full gap-2.5 px-3 py-2.5 text-left'
+                                className={`flex items-center rounded-xl transition-all duration-300 group cursor-pointer ${
+                                    sidebarCollapsed ? 'justify-center w-10 h-10 px-0 mx-auto' : 'w-full gap-2.5 px-3 py-2.5 text-left border border-transparent'
                                 } ${
                                     session.id === activeSessionId
-                                        ? darkMode ? 'bg-brand-purple/15 border border-brand-purple-accent/25' : 'bg-white/15 border border-white/20'
-                                        : darkMode ? 'hover:bg-white/5' : 'hover:bg-white/8'
+                                        ? darkMode ? 'bg-brand-purple/20 border border-brand-purple-accent/30 text-white shadow-[0_0_10px_rgba(168,85,247,0.1)]' : 'bg-white/15 border border-white/20 text-white shadow-[0_0_10px_rgba(255,255,255,0.05)]'
+                                        : darkMode ? 'hover:bg-white/5 hover:border-white/5' : 'hover:bg-white/8 hover:border-white/10'
                                 }`}
                                 title={sidebarCollapsed ? session.title : undefined}
                             >
                                 <span className={`flex items-center justify-center flex-shrink-0 ${
                                     session.id === activeSessionId
-                                        ? darkMode ? 'text-brand-purple-accent' : 'text-white'
-                                        : darkMode ? 'text-dark-muted' : 'text-white/40'
+                                        ? darkMode ? 'text-brand-purple-accent' : 'text-pink-300 drop-shadow-[0_0_6px_rgba(244,114,182,0.4)]'
+                                        : darkMode ? 'text-dark-muted' : 'text-white/50'
                                 }`}><ChatIcon /></span>
                                 {!sidebarCollapsed && (
                                     <>
                                         <div className="flex-1 min-w-0">
-                                            <p className={`text-xs font-medium truncate ${
+                                            <p className={`text-xs font-semibold truncate ${
                                                 session.id === activeSessionId
-                                                    ? darkMode ? 'text-dark-text' : 'text-white'
-                                                    : darkMode ? 'text-dark-muted group-hover:text-dark-text' : 'text-white/50 group-hover:text-white/80'
+                                                    ? darkMode ? 'text-dark-text' : 'text-cyan-200'
+                                                    : darkMode ? 'text-dark-muted group-hover:text-dark-text' : 'text-white/70 group-hover:text-white'
                                             }`}>{session.title}</p>
                                             <p className={`text-[9px] truncate mt-0.5 ${
-                                                darkMode ? 'text-dark-muted/60' : 'text-white/30'
+                                                darkMode ? 'text-dark-muted/60' : 'text-white/40'
                                             }`}>{session.messages.length - 1} message{session.messages.length !== 2 ? 's' : ''}</p>
                                         </div>
                                         <button
                                             onClick={(e) => deleteSession(e, session.id)}
                                             className={`p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity ${
-                                                darkMode ? 'text-red-400 hover:bg-red-500/20' : 'text-red-500 hover:bg-red-100'
+                                                darkMode ? 'text-red-400 hover:bg-red-500/20' : 'text-red-400 hover:bg-red-500/20'
                                             }`}
                                         >
                                             <TrashIcon />
                                         </button>
                                         {session.id === activeSessionId && (
                                             <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ml-1 ${
-                                                darkMode ? 'bg-brand-purple' : 'bg-white'
+                                                darkMode ? 'bg-brand-purple' : 'bg-cyan-300 shadow-[0_0_6px_rgba(0,255,255,0.8)]'
                                             }`} />
                                         )}
                                     </>
@@ -945,7 +966,7 @@ export default function ChatApp() {
 
                 {/* Preferences Header */}
                 {!sidebarCollapsed && (
-                    <p className={`text-[9px] font-bold tracking-[0.2em] uppercase px-4 mb-2 ${darkMode ? 'text-dark-muted' : 'text-white/40'}`}>
+                    <p className={`text-[9px] font-extrabold tracking-[0.25em] uppercase px-4 mb-2 ${darkMode ? 'text-dark-muted' : 'text-pink-300 drop-shadow-[0_0_6px_rgba(244,114,182,0.3)]'}`}>
                         Preferences Settings
                     </p>
                 )}
@@ -955,10 +976,10 @@ export default function ChatApp() {
                     {/* Dark Mode Toggle */}
                     <button
                         onClick={() => startTransition(() => setDarkMode(!darkMode))}
-                        className={`flex items-center rounded-xl text-sm font-medium transition-all duration-300 cursor-pointer ${
+                        className={`flex items-center rounded-xl text-sm font-semibold transition-all duration-300 cursor-pointer border ${
                             sidebarCollapsed 
-                                ? 'w-10 h-10 justify-center p-0 hover:bg-brand-purple/20 text-white'
-                                : 'w-full justify-between px-4 py-3 bg-white/10 text-white hover:bg-white/15'
+                                ? 'w-10 h-10 justify-center p-0 hover:bg-brand-purple/20 text-white border-transparent'
+                                : 'w-full justify-between px-4 py-3 bg-white/10 border-white/20 text-white hover:bg-white/15'
                         } ${
                             !sidebarCollapsed && darkMode ? 'bg-dark-card border border-dark-border text-white hover:bg-brand-purple/20 hover:border-brand-purple-accent/50' : ''
                         }`}
@@ -969,7 +990,7 @@ export default function ChatApp() {
                             {!sidebarCollapsed && (darkMode ? 'Dark Mode' : 'Light Mode')}
                         </span>
                         {!sidebarCollapsed && (
-                            <div className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${darkMode ? 'bg-brand-purple' : 'bg-white/30'}`}>
+                            <div className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${darkMode ? 'bg-brand-purple/50 border border-brand-purple-accent/30' : 'bg-white/20 border border-white/30'}`}>
                                 <motion.div
                                     animate={{ x: darkMode ? 20 : 0 }}
                                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -983,8 +1004,8 @@ export default function ChatApp() {
                     {showDevTools && (
                     <div className={`${
                         sidebarCollapsed 
-                            ? 'w-10 h-10 flex items-center justify-center rounded-xl cursor-pointer hover:bg-white/10'
-                            : 'p-4 rounded-xl transition-colors duration-300 bg-white/10'
+                            ? 'w-10 h-10 flex items-center justify-center rounded-xl cursor-pointer hover:bg-white/10 border border-transparent'
+                            : 'p-4 rounded-xl transition-colors duration-300 bg-white/10 border border-white/20'
                     } ${
                         !sidebarCollapsed && darkMode ? 'bg-white/5 border border-dark-border' : ''
                     }`}
@@ -999,14 +1020,14 @@ export default function ChatApp() {
                                     <p className={`text-xs font-bold tracking-wide ${darkMode ? 'text-dark-text' : 'text-white'}`}>
                                         {useMock ? '🧪 Mock Mode' : '🔴 Live API'}
                                     </p>
-                                    <p className={`text-[10px] mt-0.5 ${darkMode ? 'text-dark-muted' : 'text-white/40'}`}>
+                                    <p className={`text-[10px] mt-0.5 ${darkMode ? 'text-dark-muted' : 'text-cyan-300/85'}`}>
                                         {useMock ? 'Using sample data' : 'Calling Gemini + MCP'}
                                     </p>
                                 </div>
                                 <button
                                     onClick={() => setUseMock(!useMock)}
                                     className={`relative w-12 h-6 rounded-full transition-colors duration-300 cursor-pointer ${
-                                        useMock ? 'bg-brand-purple' : 'bg-emerald-500'
+                                        useMock ? 'bg-brand-purple/50 border border-brand-purple-accent/30' : 'bg-emerald-500/50 border border-emerald-400/30'
                                     }`}
                                 >
                                     <motion.div
@@ -1024,24 +1045,24 @@ export default function ChatApp() {
                 {/* Footer */}
                 {!sidebarCollapsed && (
                     <div className="px-4 pb-4">
-                        <div className={`p-3 rounded-xl text-[10px] ${
-                            darkMode ? 'bg-white/5 text-dark-muted border border-dark-border' : 'bg-white/5 text-white/40'
+                        <div className={`p-3 rounded-xl text-[10px] border ${
+                            darkMode ? 'bg-white/5 text-dark-muted border border-dark-border' : 'bg-white/5 text-white/60 border-white/10'
                         }`}>
-                            <p className={`font-bold mb-0.5 ${darkMode ? 'text-dark-text' : 'text-white/70'}`}>Hackathon 2026</p>
-                            <p>Powered by Gemini · MCP · Kapruka</p>
+                            <p className="font-bold mb-0.5 text-lg gradient-text">Hackathon 2026</p>
+                            <p className="font-medium text-white/75">Powered by Gemini · MCP · Kapruka</p>
                         </div>
                     </div>
                 )}
             </div>
 
             {/* ═══════════════ PANE 2: CHAT FEED ═══════════════ */}
-            <div className={`flex-1 flex flex-col relative h-full noise-bg ${darkMode ? 'bg-[#121212]' : 'bg-[#E5E5E5]'}`}>
+            <div className={`flex-1 flex flex-col relative h-full noise-bg ${darkMode ? 'bg-[#121212]' : 'bg-[#402970]'}`}>
                 {/* WhatsApp style shopping doodle background */}
                 <div 
                     className={`absolute inset-0 pointer-events-none z-0 transition-opacity duration-500 ${darkMode ? 'bg-white opacity-[0.03]' : 'bg-[#002F6C] opacity-[0.04]'}`}
                     style={{
-                        maskImage: shoppingPattern,
-                        WebkitMaskImage: shoppingPattern,
+                        maskImage: techPattern,
+                        WebkitMaskImage: techPattern,
                         maskRepeat: 'repeat',
                         WebkitMaskRepeat: 'repeat',
                         maskSize: '180px',
@@ -1059,7 +1080,7 @@ export default function ChatApp() {
                 <div className={`hidden md:flex items-center justify-between px-6 py-3 border-b z-10 transition-colors duration-300 ${
                     darkMode
                         ? 'bg-dark-surface/60 backdrop-blur border-dark-border'
-                        : 'bg-white/70 backdrop-blur border-gray-100 shadow-sm'
+                        : 'bg-white/10 backdrop-blur-xl border-white/20 shadow-[0_4px_30px_rgba(255,255,255,0.05)]'
                 }`}>
                     {/* Left: active chat info */}
                     <div className="flex items-center gap-3">
@@ -1068,18 +1089,18 @@ export default function ChatApp() {
                         }`}><ChatIcon /></div>
                         <div>
                             <p className={`text-sm font-bold leading-tight ${
-                                darkMode ? 'text-dark-text' : 'text-gray-900'
+                                darkMode ? 'text-dark-text' : 'text-white drop-shadow-sm'
                             }`}>{activeSession?.title || 'Active Chat'}</p>
                             <p className={`text-[10px] ${
-                                darkMode ? 'text-dark-muted' : 'text-gray-400'
+                                darkMode ? 'text-dark-muted' : 'text-cyan-100/80 font-medium'
                             }`}>{messages.length - 1} message{messages.length !== 2 ? 's' : ''} · {useMock ? '🧪 Mock' : '🔴 Live'}</p>
                         </div>
                     </div>
                     {/* Right: actions */}
                     <div className="flex items-center gap-2">
                         {/* Language Selector */}
-                        <div className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold mr-1.5 border ${
-                            darkMode ? 'border-dark-border bg-white/5' : 'border-gray-200 bg-gray-50'
+                        <div className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold mr-1.5 border shadow-inner ${
+                            darkMode ? 'border-dark-border bg-white/5' : 'border-white/20 bg-white/10'
                         }`}>
                             <span className="text-sm mr-0.5">🌐</span>
                             {(['en', 'si', 'ta'] as const).map((lang) => {
@@ -1093,10 +1114,10 @@ export default function ChatApp() {
                                             isActive
                                                 ? darkMode 
                                                     ? 'bg-brand-purple/20 text-brand-purple-accent font-bold' 
-                                                    : 'bg-brand-purple/10 text-brand-purple font-bold'
+                                                    : 'bg-white/20 text-cyan-300 font-bold shadow-[0_0_10px_rgba(0,255,255,0.2)]'
                                                 : darkMode
                                                     ? 'text-dark-muted hover:text-dark-text'
-                                                    : 'text-gray-500 hover:text-gray-950'
+                                                    : 'text-white/60 hover:text-white'
                                         }`}
                                     >
                                         {labels[lang]}
@@ -1110,7 +1131,7 @@ export default function ChatApp() {
                             className={`relative flex items-center justify-center p-2 rounded-lg transition-all duration-200 cursor-pointer ${
                             darkMode
                                 ? 'bg-white/5 text-dark-muted hover:bg-white/10 hover:text-dark-text border border-dark-border'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                : 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
                         }`}>
                             <span className="flex items-center justify-center"><CartIcon /></span>
                             {cart.length > 0 && (
@@ -1124,7 +1145,7 @@ export default function ChatApp() {
                             className={`p-2 rounded-lg transition-all duration-200 ${
                                 darkMode
                                     ? 'bg-dark-card text-white hover:bg-brand-purple/20 hover:text-brand-purple border border-dark-border hover:border-brand-purple/50'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    : 'bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-sm'
                             }`}
                         >
                             {darkMode ? <SunIcon /> : <MoonIcon />}
@@ -1192,21 +1213,21 @@ export default function ChatApp() {
                 {showHelp ? (
                     <div className="flex-1 flex flex-col overflow-y-auto p-6 md:p-10 space-y-6 relative z-10">
                         {/* FAQ Header */}
-                        <div className="flex justify-between items-center pb-4 border-b border-gray-200 dark:border-dark-border">
+                        <div className="flex justify-between items-center pb-4 border-b border-white/10 dark:border-dark-border">
                             <div>
-                                <h2 className="text-2xl md:text-3xl font-black tracking-tight leading-tight">
-                                    How to Chat with <span className="bg-gradient-to-r from-brand-purple via-brand-purple-light to-[#A17BD9] bg-clip-text text-transparent">Ayla</span>
+                                <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight leading-tight text-white">
+                                    How to Chat with <span className="gradient-text">Ayla</span>
                                 </h2>
-                                <p className={`text-[10px] font-extrabold tracking-[0.25em] uppercase mt-1 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>
+                                <p className={`text-[10px] font-black tracking-[0.25em] uppercase mt-1 ${darkMode ? 'text-dark-muted' : 'text-cyan-300 drop-shadow-[0_0_6px_rgba(0,255,255,0.3)]'}`}>
                                     Frequently Asked Questions &amp; Guide
                                 </p>
                             </div>
                             <button
                                 onClick={() => setShowHelp(false)}
-                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
+                                className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all duration-300 border cursor-pointer active:scale-95 ${
                                     darkMode
-                                        ? 'bg-white/10 text-white hover:bg-white/20'
-                                        : 'bg-brand-purple text-white hover:opacity-90'
+                                        ? 'bg-white/10 border-white/15 text-white hover:bg-white/20'
+                                        : 'bg-gradient-to-r from-pink-500/80 to-purple-600/80 border-white/20 text-white hover:from-pink-500 hover:to-purple-600 shadow-md'
                                 }`}
                             >
                                 ← Back to Chat
@@ -1214,26 +1235,26 @@ export default function ChatApp() {
                         </div>
 
                         {/* Welcome Card */}
-                        <div className={`rounded-2xl p-6 border ${
-                            darkMode ? 'bg-brand-purple/10 border-brand-purple-accent/20' : 'bg-gradient-to-br from-brand-purple/5 to-brand-purple-light/10 border-brand-purple/15'
+                        <div className={`rounded-2xl p-6 border backdrop-blur-md ${
+                            darkMode ? 'bg-brand-purple/10 border-brand-purple-accent/20' : 'bg-white/10 border-white/20 shadow-md'
                         }`}>
                             <div className="flex items-center gap-4 mb-3">
-                                <div className="w-12 h-12 bg-gradient-to-br from-brand-purple to-brand-purple-light rounded-xl flex items-center justify-center text-2xl shadow-lg shadow-brand-purple/20">
+                                <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-purple-600 rounded-xl flex items-center justify-center text-2xl shadow-lg shadow-pink-500/20">
                                     🎁
                                 </div>
                                 <div>
-                                    <h3 className={`font-bold text-base ${darkMode ? 'text-dark-text' : 'text-gray-900'}`}>Meet Ayla</h3>
-                                    <p className={`text-xs mt-0.5 ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Your AI-powered gift shopping assistant for Sri Lanka</p>
+                                    <h3 className="font-extrabold text-base text-white">Meet Ayla</h3>
+                                    <p className={`text-xs mt-0.5 ${darkMode ? 'text-dark-muted' : 'text-cyan-300 font-bold'}`}>Your AI-powered gift shopping assistant for Sri Lanka</p>
                                 </div>
                             </div>
-                            <p className={`text-sm leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>
+                            <p className={`text-sm leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-white/90'}`}>
                                 Simply type what you're looking for in natural language. You can search products, check delivery availability, place orders, and track shipments — all through a conversational interface.
                             </p>
                         </div>
 
                         {/* Example Prompts */}
                         <div>
-                            <p className={`text-xs font-bold uppercase tracking-widest mb-3 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>Try these examples</p>
+                            <p className={`text-xs font-extrabold uppercase tracking-widest mb-3 text-pink-300 drop-shadow-[0_0_6px_rgba(244,114,182,0.4)]`}>Try these examples</p>
                             <div className="flex flex-wrap gap-2">
                                 {[
                                     '🎂 Show me birthday cakes',
@@ -1246,10 +1267,10 @@ export default function ChatApp() {
                                     <button
                                         key={i}
                                         onClick={() => { setShowHelp(false); sendMessage(prompt); }}
-                                        className={`px-4 py-2 rounded-full text-xs font-semibold transition-all duration-200 ${
+                                        className={`px-4 py-2 rounded-full text-xs font-semibold transition-all duration-300 border cursor-pointer active:scale-95 ${
                                             darkMode
                                                 ? 'bg-white/5 border border-dark-border text-dark-text hover:bg-brand-purple/20 hover:border-brand-purple/40 hover:text-brand-purple'
-                                                : 'bg-white border border-gray-200 text-gray-700 hover:bg-brand-purple hover:text-white hover:border-brand-purple shadow-sm'
+                                                : 'bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-cyan-300/40 hover:text-cyan-200 shadow-sm backdrop-blur-sm'
                                         }`}
                                     >
                                         {prompt}
@@ -1259,10 +1280,10 @@ export default function ChatApp() {
                         </div>
 
                         {/* FAQ Accordion */}
-                        <div className="max-w-4xl w-full mx-auto space-y-4 pb-10">
+                        <div className="max-w-6xl w-full mx-auto space-y-4 pb-10">
                             <div className="text-center mb-8">
-                                <h3 className={`text-2xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Frequently Asked Questions</h3>
-                                <p className={`text-sm ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Everything you need to know about shopping with Ayla.</p>
+                                <h3 className="text-2xl font-extrabold mb-2 text-white">Frequently Asked Questions</h3>
+                                <p className={`text-sm ${darkMode ? 'text-dark-muted' : 'text-cyan-300/80 font-medium'}`}>Everything you need to know about shopping with Ayla.</p>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {faqs.map((faq, idx) => {
@@ -1270,18 +1291,18 @@ export default function ChatApp() {
                                     return (
                                         <div
                                             key={idx}
-                                            className={`rounded-2xl border overflow-hidden transition-all duration-300 ${
+                                            className={`rounded-2xl border overflow-hidden transition-all duration-300 backdrop-blur-md ${
                                                 isExpanded
-                                                    ? darkMode ? 'bg-brand-purple/10 border-brand-purple-accent/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]' : 'bg-brand-purple/5 border-brand-purple/30 shadow-md'
-                                                    : darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple-accent/30' : 'bg-white border-gray-100 hover:border-brand-purple/20 hover:shadow-md'
+                                                    ? darkMode ? 'bg-brand-purple/10 border-brand-purple-accent/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]' : 'bg-white/20 border-pink-300/40 shadow-lg shadow-pink-500/10'
+                                                    : darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple-accent/30' : 'bg-white/10 border-white/20 hover:border-cyan-300/40 hover:shadow-md'
                                             }`}
                                         >
                                             <button
                                                 onClick={() => setExpandedFaq(isExpanded ? null : idx)}
                                                 className="w-full flex justify-between items-start px-6 py-5 text-left cursor-pointer group"
                                             >
-                                                <span className={`text-[15px] font-semibold pr-4 leading-snug group-hover:text-brand-purple transition-colors ${darkMode ? 'text-dark-text' : 'text-gray-800'}`}>{faq.q}</span>
-                                                <span className={`text-2xl font-light transition-transform duration-300 flex-shrink-0 mt-[-4px] ${isExpanded ? 'rotate-45 text-brand-purple-accent' : 'text-gray-400 group-hover:text-brand-purple'} ${darkMode && !isExpanded ? 'text-dark-muted' : ''}`}>
+                                                <span className={`text-[15px] font-semibold pr-4 leading-snug group-hover:text-pink-300 transition-colors ${darkMode ? 'text-dark-text' : 'text-white'}`}>{faq.q}</span>
+                                                <span className={`text-2xl font-light transition-transform duration-300 flex-shrink-0 mt-[-4px] ${isExpanded ? 'rotate-45 text-pink-300' : 'text-white/60 group-hover:text-pink-300'} ${darkMode && !isExpanded ? 'text-dark-muted' : ''}`}>
                                                     +
                                                 </span>
                                             </button>
@@ -1289,7 +1310,7 @@ export default function ChatApp() {
                                                 className={`transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-40 opacity-100 mb-4' : 'max-h-0 opacity-0'} overflow-hidden`}
                                             >
                                                 <div className={`px-6 text-[14px] leading-relaxed border-t mt-1 pt-4 ${
-                                                    darkMode ? 'text-dark-muted border-dark-border' : 'text-gray-600 border-gray-100'
+                                                    darkMode ? 'text-dark-muted border-dark-border' : 'text-white/80 border-white/10'
                                                 }`}>
                                                     {faq.a}
                                                 </div>
@@ -1308,12 +1329,12 @@ export default function ChatApp() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.5 }}
-                            className="hidden sm:block fixed right-[-10%] md:right-[-15%] lg:right-[-12%] 2xl:right-[-10%] top-[10%] md:top-[15%] w-72 h-72 md:w-[500px] md:h-[500px] lg:w-[700px] lg:h-[950px] 2xl:w-[850px] 2xl:h-[950px] opacity-100 dark:opacity-100 pointer-events-none z-10 blur-[0.5px] drop-shadow-2xl"
+                            className="hidden sm:block fixed right-[-10%] md:right-[-15%] lg:right-[-12%] 2xl:right-[-10%] top-[10%] md:top-[15%] w-72 h-72 md:w-[500px] md:h-[500px] lg:w-[700px] lg:h-[950px] 2xl:w-[850px] 2xl:h-[950px] pointer-events-none z-10 blur-[0.5px] drop-shadow-2xl"
                         >
-                            <img src="/ayla_3d_avatar.png" alt="Ayla AI" className="w-full h-full object-contain relative z-10" />
+                            <img src="/ayla_3d_avatar.png" alt="Ayla AI" className="w-full h-full object-contain relative z-10" style={{ opacity: 0.15 }} />
                         </motion.div>
                     )}
-                    <div id="main-chat-container" className="flex-1 overflow-y-auto overflow-x-hidden p-6 md:p-10 space-y-6 relative z-10">
+                    <div id="main-chat-container" className="flex-1 overflow-y-auto overflow-x-hidden p-6 md:p-10 space-y-6 relative z-10 w-full max-w-7xl mx-auto">
                         <AnimatePresence>
                         {messages.length === 1 ? (
                             <motion.div
@@ -1328,10 +1349,10 @@ export default function ChatApp() {
                                 initial="hidden"
                                 animate="show"
                                 exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
-                                className="flex flex-col items-center max-w-5xl mx-auto py-6 text-center gap-10"
+                                className="flex flex-col items-center max-w-7xl mx-auto py-6 text-center gap-10"
                             >
                                  {/* Hero Section */}
-                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="relative flex flex-col items-center gap-6 w-full max-w-5xl px-4 py-8">
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="relative flex flex-col items-center gap-6 w-full max-w-7xl px-4 py-8">
                                     
                                     {/* Center: Text & Actions */}
                                     <AnimatePresence mode="wait">
@@ -1343,57 +1364,55 @@ export default function ChatApp() {
                                         transition={{ duration: 0.2 }}
                                         className="flex flex-col items-center text-center gap-2 z-10"
                                     >
-                                        <p className="text-brand-purple dark:text-brand-purple-accent text-xs font-bold uppercase tracking-[0.25em] bg-brand-purple/10 px-4 py-1.5 rounded-full border border-brand-purple/20 backdrop-blur-md mb-2">
-                                            {translations[currentLang].heroSub}
+                                        <p className="text-cyan-300 text-base md:text-lg font-extrabold tracking-wide bg-white/10 px-6 py-2 rounded-full border border-white/20 backdrop-blur-md mb-3 shadow-[0_0_15px_rgba(0,255,255,0.3)]">
+                                            ආයුබෝවන් • வணக்கம் • Welcome
                                         </p>
-                                        <h2 className={`text-4xl sm:text-5xl md:text-7xl font-serif font-black tracking-tighter leading-[1] max-w-4xl bg-clip-text text-transparent pb-2 drop-shadow-sm ${darkMode ? 'bg-gradient-to-br from-white via-gray-300 to-gray-500' : 'bg-gradient-to-br from-gray-900 via-gray-700 to-gray-500'}`}>
+                                        <h2 className="text-4xl sm:text-5xl md:text-7xl font-serif font-black tracking-tighter leading-[1] max-w-6xl bg-clip-text text-transparent pb-2 drop-shadow-md bg-gradient-to-br from-white via-cyan-50 to-pink-100">
                                             {translations[currentLang].heroTitle.split('Ayla').map((part, i, arr) => (
                                                 <Fragment key={i}>
                                                     {part}
                                                     {i < arr.length - 1 && (
-                                                        <span className={`font-script font-normal tracking-normal pb-2 inline-block -mb-4 drop-shadow-md px-2 ${darkMode ? 'text-pink-400 drop-shadow-[0_0_15px_rgba(244,114,182,0.6)]' : 'text-brand-purple-accent'}`}>
+                                                        <span className="font-script font-normal tracking-normal pb-2 inline-block -mb-4 px-2 text-pink-400 drop-shadow-[0_0_15px_rgba(244,114,182,0.8)]">
                                                             Ayla
                                                         </span>
                                                     )}
                                                 </Fragment>
                                             ))}
                                         </h2>
-                                        <p className={`text-sm md:text-base lg:text-lg max-w-2xl leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-600'}`}>
+                                        <p className="text-sm md:text-base lg:text-lg max-w-2xl leading-relaxed text-white/90">
                                             {translations[currentLang].heroDesc}
                                         </p>
 
                                         {/* Playful Capability Text */}
-                                        <p className={`italic font-medium text-sm md:text-base ${darkMode ? 'text-brand-purple-accent/90' : 'text-brand-purple/90'}`}>
+                                        <p className="italic font-bold text-sm md:text-base text-pink-300 drop-shadow-[0_0_10px_rgba(255,105,180,0.6)]">
                                             {translations[currentLang].tryMeText}
                                         </p>
 
                                         {/* Language Support Indicator Trust Badge */}
-                                        <div className={`mt-2 flex flex-col items-center gap-1.5 px-6 py-3 rounded-2xl border backdrop-blur-md ${
-                                            darkMode ? 'bg-dark-card/60 border-dark-border/60' : 'bg-brand-purple/5 border-brand-purple/10'
-                                        }`}>
+                                        <div className="mt-2 flex flex-col items-center gap-1.5 px-6 py-3 rounded-2xl border backdrop-blur-md bg-white/10 border-white/20 shadow-[0_0_20px_rgba(0,255,255,0.15)]">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-sm">🇱🇰</span>
-                                                <span className={`text-xs font-bold tracking-wider ${darkMode ? 'text-brand-purple-accent' : 'text-brand-purple'}`}>
+                                                <span className="text-xs font-bold tracking-wider text-cyan-300">
                                                     {translations[currentLang].trustIndicator}
                                                 </span>
                                             </div>
-                                            <span className={`text-[10px] ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
+                                            <span className="text-[10px] text-white/80 font-medium">
                                                 {translations[currentLang].trustIndicatorSub}
                                             </span>
                                         </div>
                                         
                                         {/* Trust Indicators */}
-                                        <div className={`flex flex-col sm:flex-row flex-wrap justify-center items-center gap-3 sm:gap-6 mt-4 text-[11px] font-semibold tracking-wider ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>
+                                        <div className="flex flex-col sm:flex-row flex-wrap justify-center items-center gap-3 sm:gap-6 mt-4 text-[11px] font-bold tracking-wider text-white/90">
                                             <div className="flex items-center gap-1.5">
-                                                <span className="text-[10px] opacity-70">⭐</span> <span>RATED BY CUSTOMERS</span>
+                                                <span className="text-[10px] opacity-90 drop-shadow-[0_0_8px_rgba(255,215,0,0.8)]">⭐</span> <span className="drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">RATED BY CUSTOMERS</span>
                                             </div>
-                                            <div className={`w-1 h-1 rounded-full hidden sm:block ${darkMode ? 'bg-dark-border' : 'bg-gray-300'}`}></div>
+                                            <div className="w-1 h-1 rounded-full hidden sm:block bg-white/40 shadow-[0_0_5px_rgba(255,255,255,0.5)]"></div>
                                             <div className="flex items-center gap-1.5">
-                                                <span className="text-[10px] opacity-70">🚚</span> <span>SAME-DAY DELIVERY</span>
+                                                <span className="text-[10px] opacity-90 drop-shadow-[0_0_8px_rgba(0,255,255,0.8)]">🚚</span> <span className="drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">SAME-DAY DELIVERY</span>
                                             </div>
-                                            <div className={`w-1 h-1 rounded-full hidden sm:block ${darkMode ? 'bg-dark-border' : 'bg-gray-300'}`}></div>
+                                            <div className="w-1 h-1 rounded-full hidden sm:block bg-white/40 shadow-[0_0_5px_rgba(255,255,255,0.5)]"></div>
                                             <div className="flex items-center gap-1.5">
-                                                <span className="text-[10px] opacity-70">🎁</span> <span>5,000+ DELIVERED</span>
+                                                <span className="text-[10px] opacity-90 drop-shadow-[0_0_8px_rgba(255,105,180,0.8)]">🎁</span> <span className="drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">5,000+ DELIVERED</span>
                                             </div>
                                         </div>
                                     </motion.div>
@@ -1403,7 +1422,7 @@ export default function ChatApp() {
 
                                     {/* Mobile-only Quick Prompts */}
                                     <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="md:hidden w-full max-w-lg text-left px-4">
-                                        <p className={`text-xs font-bold uppercase tracking-widest mb-3 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>
+                                        <p className="text-xs font-bold uppercase tracking-widest mb-3 text-cyan-300 drop-shadow-[0_0_8px_rgba(0,255,255,0.5)]">
                                             {translations[currentLang].tryPrompts}
                                         </p>
                                         <div className="grid grid-cols-2 gap-2.5">
@@ -1417,11 +1436,11 @@ export default function ChatApp() {
                                                     key={i}
                                                     onClick={() => sendMessage(p.t)}
                                                     className={`text-left p-3.5 rounded-2xl border transition-all duration-200 flex items-start gap-2 cursor-pointer active:scale-95 ${
-                                                        darkMode ? 'bg-dark-card/50 border-dark-border hover:border-brand-purple-accent/50' : 'bg-white border-gray-200 shadow-sm hover:border-brand-purple'
+                                                        darkMode ? 'bg-dark-card/50 border-dark-border hover:border-brand-purple-accent/50' : 'bg-white/10 border-white/20 hover:bg-white/15 text-white'
                                                     }`}
                                                 >
                                                     <span className="text-lg">{p.i}</span>
-                                                    <span className={`text-xs font-semibold leading-snug ${darkMode ? 'text-dark-text' : 'text-gray-700'}`}>{p.t}</span>
+                                                    <span className={`text-xs font-semibold leading-snug ${darkMode ? 'text-dark-text' : 'text-white'}`}>{p.t}</span>
                                                 </button>
                                             ))}
                                         </div>
@@ -1438,44 +1457,46 @@ export default function ChatApp() {
                                             if (chatContainer) chatContainer.scrollBy({ top: 450, behavior: 'smooth' });
                                         }}
                                     >
-                                        <span className={`text-[10px] font-bold tracking-widest uppercase mb-3 transition-colors ${darkMode ? 'text-dark-muted group-hover:text-brand-purple-accent' : 'text-gray-500 group-hover:text-brand-purple'}`}>
+                                        <span className={`text-[10px] font-bold tracking-widest uppercase mb-3 transition-colors ${darkMode ? 'text-dark-muted group-hover:text-brand-purple-accent' : 'text-white/60 group-hover:text-cyan-300'}`}>
                                             Scroll to explore
                                         </span>
                                         <motion.div
                                             animate={{ y: [0, 8, 0] }}
                                             transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                                            className={`w-11 h-11 rounded-full flex items-center justify-center shadow-sm transition-all duration-300 ${darkMode ? 'bg-dark-card border border-brand-purple-accent/30 text-brand-purple-accent group-hover:bg-brand-purple/20' : 'bg-white border border-brand-purple/20 text-brand-purple group-hover:shadow-md group-hover:border-brand-purple'}`}
+                                            className={`w-11 h-11 rounded-full flex items-center justify-center shadow-sm transition-all duration-300 ${darkMode ? 'bg-dark-card border border-brand-purple-accent/30 text-brand-purple-accent group-hover:bg-brand-purple/20' : 'bg-white/10 border border-white/20 text-pink-300 group-hover:bg-white/20 group-hover:border-pink-300/50 group-hover:shadow-[0_0_15px_rgba(244,114,182,0.4)]'}`}
                                         >
                                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                                         </motion.div>
                                     </motion.div>
                                 {/* Customer-Focused Benefits */}
-                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="hidden md:grid grid-cols-1 tablet:grid-cols-3 gap-4 w-full max-w-4xl text-left">
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="hidden md:grid grid-cols-1 tablet:grid-cols-3 gap-4 w-full max-w-6xl text-left">
                                     {/* Benefit 1 */}
-                                    <div className={`p-6 rounded-3xl border transition-all duration-300 ${darkMode ? 'bg-dark-card border-dark-border' : 'bg-white border-gray-100 shadow-sm'}`}>
+                                    <div className={`p-6 rounded-3xl border transition-all duration-300 bg-white/10 border-white/20 shadow-md backdrop-blur-md hover:bg-white/15 hover:border-cyan-300/40 hover:shadow-[0_0_20px_rgba(0,255,255,0.15)] hover:-translate-y-1`}>
                                         <span className="text-3xl mb-4 block">🎁</span>
-                                        <h4 className={`font-bold text-sm mb-2 ${darkMode ? 'text-dark-text' : 'text-gray-900'}`}>Find the Perfect Gift</h4>
-                                        <p className={`text-xs leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>AI recommendations based on occasion and budget.</p>
+                                        <h4 className="font-extrabold text-sm mb-2 text-cyan-200 drop-shadow-[0_0_6px_rgba(0,255,255,0.3)]">Find the Perfect Gift</h4>
+                                        <p className="text-xs leading-relaxed text-white/90">AI recommendations based on occasion and budget.</p>
                                     </div>
                                     {/* Benefit 2 */}
-                                    <div className={`p-6 rounded-3xl border transition-all duration-300 ${darkMode ? 'bg-dark-card border-dark-border' : 'bg-white border-gray-100 shadow-sm'}`}>
+                                    <div className={`p-6 rounded-3xl border transition-all duration-300 bg-white/10 border-white/20 shadow-md backdrop-blur-md hover:bg-white/15 hover:border-cyan-300/40 hover:shadow-[0_0_20px_rgba(0,255,255,0.15)] hover:-translate-y-1`}>
                                         <span className="text-3xl mb-4 block">🚚</span>
-                                        <h4 className={`font-bold text-sm mb-2 ${darkMode ? 'text-dark-text' : 'text-gray-900'}`}>Island-Wide Delivery</h4>
-                                        <p className={`text-xs leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Real-time delivery estimates and tracking.</p>
+                                        <h4 className="font-extrabold text-sm mb-2 text-cyan-200 drop-shadow-[0_0_6px_rgba(0,255,255,0.3)]">Island-Wide Delivery</h4>
+                                        <p className="text-xs leading-relaxed text-white/90">Real-time delivery estimates and tracking.</p>
                                     </div>
                                     {/* Benefit 3 */}
-                                    <div className={`p-6 rounded-3xl border transition-all duration-300 ${darkMode ? 'bg-dark-card border-dark-border' : 'bg-white border-gray-100 shadow-sm'}`}>
+                                    <div className={`p-6 rounded-3xl border transition-all duration-300 bg-white/10 border-white/20 shadow-md backdrop-blur-md hover:bg-white/15 hover:border-cyan-300/40 hover:shadow-[0_0_20px_rgba(0,255,255,0.15)] hover:-translate-y-1`}>
                                         <span className="text-3xl mb-4 block">⚡</span>
-                                        <h4 className={`font-bold text-sm mb-2 ${darkMode ? 'text-dark-text' : 'text-gray-900'}`}>Fast Checkout</h4>
-                                        <p className={`text-xs leading-relaxed ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>Complete purchases without leaving the conversation.</p>
+                                        <h4 className="font-extrabold text-sm mb-2 text-cyan-200 drop-shadow-[0_0_6px_rgba(0,255,255,0.3)]">Fast Checkout</h4>
+                                        <p className="text-xs leading-relaxed text-white/90">Complete purchases without leaving the conversation.</p>
                                     </div>
                                 </motion.div>
 
                                 {/* Suggested Prompts Grid */}
-                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="hidden md:block w-full max-w-4xl text-left mt-4">
-                                    <h3 className={`text-xs font-bold uppercase tracking-widest mb-6 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>
-                                        {translations[currentLang].tryPrompts}
-                                    </h3>
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="hidden md:block w-full max-w-6xl text-left mt-4">
+                                    <div className="hidden md:block w-full text-center px-4">
+                                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] mb-4 text-cyan-300 drop-shadow-[0_0_8px_rgba(0,255,255,0.5)]">
+                                            {translations[currentLang].tryPrompts}
+                                        </p>
+                                    </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 tablet:grid-cols-3 lg:grid-cols-4 gap-3">
                                         {[
                                             { t: "Find gifts under Rs. 5,000", i: "🏷️", sub: "Budget Friendly" },
@@ -1490,35 +1511,31 @@ export default function ChatApp() {
                                             <button 
                                                 key={i}
                                                 onClick={() => sendMessage(p.t)}
-                                                className={`text-left p-4 rounded-2xl border transition-all duration-200 flex flex-col items-start gap-2 group cursor-pointer hover:-translate-y-1 ${
-                                                    darkMode ? 'bg-dark-card/50 border-dark-border hover:border-brand-purple-accent/50 hover:bg-brand-purple/5' : 'bg-white border-gray-200 hover:border-brand-purple hover:shadow-lg'
-                                                }`}
+                                                className={`text-left p-4 rounded-2xl border transition-all duration-300 flex flex-col items-start gap-2 group cursor-pointer hover:-translate-y-1 bg-white/10 border-white/20 hover:bg-white/15 hover:border-pink-300/40 shadow-sm backdrop-blur-md hover:shadow-[0_0_20px_rgba(244,114,182,0.25)]`}
                                             >
                                                 <div className="flex items-center gap-2 w-full mb-1">
                                                     <span className="text-xl">{p.i}</span>
-                                                    <span className={`text-[10px] uppercase font-bold tracking-widest ${darkMode ? 'text-dark-muted/70' : 'text-gray-400'}`}>{p.sub}</span>
+                                                    <span className="text-[9px] uppercase font-black tracking-widest text-cyan-300/90 drop-shadow-[0_0_5px_rgba(0,255,255,0.3)]">{p.sub}</span>
                                                 </div>
-                                                <span className={`text-xs font-semibold leading-relaxed ${darkMode ? 'text-dark-text group-hover:text-brand-purple-accent' : 'text-gray-700 group-hover:text-brand-purple'}`}>{p.t}</span>
+                                                <span className="text-xs font-semibold leading-relaxed text-white group-hover:text-pink-300 transition-colors">{p.t}</span>
                                             </button>
                                         ))}
                                     </div>
                                 </motion.div>
 
                                 {/* Local Trust Section */}
-                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="hidden md:block w-full max-w-4xl text-left mt-4">
-                                    <div className={`p-6 md:p-8 rounded-3xl border ${
-                                        darkMode ? 'bg-dark-card/40 border-dark-border/80' : 'bg-white border-gray-150 shadow-sm'
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="hidden md:block w-full max-w-6xl text-left mt-4">
+                                    <div className={`p-6 md:p-8 rounded-3xl border backdrop-blur-md shadow-lg ${
+                                        darkMode ? 'bg-dark-card/40 border-dark-border/80' : 'bg-white/10 border-white/20'
                                     }`}>
-                                        <h3 className={`text-sm font-bold uppercase tracking-widest mb-6 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>
+                                        <h3 className="text-sm font-bold uppercase tracking-widest mb-6 text-cyan-300 drop-shadow-[0_0_8px_rgba(0,255,255,0.4)]">
                                             {translations[currentLang].servingCities}
                                         </h3>
                                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 laptop:grid-cols-6 gap-3 mb-6">
                                             {['Colombo', 'Kandy', 'Galle', 'Jaffna', 'Negombo', 'Batticaloa'].map((city) => (
                                                 <div 
                                                     key={city}
-                                                    className={`py-3 px-4 rounded-xl border text-center font-semibold text-xs transition-colors ${
-                                                        darkMode ? 'bg-white/5 border-dark-border text-dark-text' : 'bg-gray-50 border-gray-100 text-gray-700'
-                                                    }`}
+                                                    className="py-3 px-4 rounded-xl border border-white/20 text-center font-bold text-xs transition-all duration-300 bg-white/10 text-white shadow-[0_0_10px_rgba(255,255,255,0.05)] hover:bg-white/20 hover:border-cyan-300/40 hover:text-cyan-200 hover:scale-105"
                                                 >
                                                     📍 {city}
                                                 </div>
@@ -1536,8 +1553,8 @@ export default function ChatApp() {
                                 </motion.div>
 
                                 {/* Shop By Occasion */}
-                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="hidden md:block w-full max-w-4xl text-left mt-8">
-                                    <h3 className={`text-xs font-bold uppercase tracking-widest mb-6 ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>Shop By Occasion</h3>
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="hidden md:block w-full max-w-6xl text-left mt-8">
+                                    <h3 className={`text-xs font-bold uppercase tracking-widest mb-6 ${darkMode ? 'text-dark-muted' : 'text-pink-300 drop-shadow-[0_0_8px_rgba(244,114,182,0.4)]'}`}>Shop By Occasion</h3>
                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                         {[
                                             { title: 'Birthday', desc: 'Cakes & Gifts', emoji: '🎂' },
@@ -1550,22 +1567,20 @@ export default function ChatApp() {
                                             <button
                                                 key={i}
                                                 onClick={() => sendMessage(`Show me gifts for ${occ.title}`)}
-                                                className={`flex flex-col items-center justify-center p-6 rounded-3xl border transition-all duration-300 cursor-pointer hover:-translate-y-1 ${
-                                                    darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple-accent/50' : 'bg-white border-gray-200 shadow-sm hover:shadow-xl hover:border-brand-purple/30'
-                                                }`}
+                                                className={`flex flex-col items-center justify-center p-6 rounded-3xl border transition-all duration-300 cursor-pointer hover:-translate-y-1 bg-white/10 border-white/20 hover:bg-white/15 hover:border-cyan-300/40 shadow-sm backdrop-blur-md hover:shadow-[0_0_20px_rgba(0,255,255,0.25)]`}
                                             >
                                                 <span className="text-4xl mb-3">{occ.emoji}</span>
-                                                <span className={`font-bold text-sm ${darkMode ? 'text-dark-text' : 'text-gray-900'}`}>{occ.title}</span>
-                                                <span className={`text-[10px] mt-1 ${darkMode ? 'text-dark-muted' : 'text-gray-500'}`}>{occ.desc}</span>
+                                                <span className="font-extrabold text-sm text-white group-hover:text-cyan-200 transition-colors drop-shadow-[0_0_5px_rgba(255,255,255,0.2)]">{occ.title}</span>
+                                                <span className="text-[10px] mt-1 text-white/80">{occ.desc}</span>
                                             </button>
                                         ))}
                                     </div>
                                 </motion.div>
 
                                 {/* Popular Products Carousel */}
-                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="hidden md:block w-full max-w-5xl text-left mt-8 overflow-hidden">
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="hidden md:block w-full max-w-7xl text-left mt-8 overflow-hidden">
                                     <div className="flex justify-between items-end mb-6 px-4 md:px-0">
-                                        <h3 className={`text-xs font-bold uppercase tracking-widest ${darkMode ? 'text-dark-muted' : 'text-brand-purple/60'}`}>Popular Gifts This Week</h3>
+                                        <h3 className={`text-xs font-bold uppercase tracking-widest ${darkMode ? 'text-dark-muted' : 'text-pink-300 drop-shadow-[0_0_8px_rgba(244,114,182,0.4)]'}`}>Popular Gifts This Week</h3>
                                     </div>
                                     <div className="flex overflow-x-auto gap-4 pb-6 snap-x snap-mandatory hide-scrollbar px-4 md:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                                         <style>{`
@@ -1585,25 +1600,21 @@ export default function ChatApp() {
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: i * 0.07 }}
                                                 whileHover={{ y: -4, scale: 1.02 }}
-                                                className={`min-w-[200px] md:min-w-[240px] snap-start flex flex-col p-4 rounded-3xl border transition-all duration-300 cursor-pointer ${
-                                                    darkMode ? 'bg-dark-card border-dark-border hover:border-brand-purple-accent' : 'bg-white border-gray-100 shadow-md hover:shadow-xl hover:border-brand-purple/50'
-                                                }`}
+                                                className={`min-w-[200px] md:min-w-[240px] snap-start flex flex-col p-4 rounded-3xl border transition-all duration-300 cursor-pointer bg-white/10 border-white/20 hover:border-pink-300/40 shadow-sm backdrop-blur-md hover:shadow-[0_0_20px_rgba(244,114,182,0.25)]`}
                                                 onClick={() => sendMessage(`I want to buy ${prod.name}`)}
                                             >
-                                                <div className={`h-32 rounded-2xl flex items-center justify-center mb-4 overflow-hidden ${
-                                                    darkMode ? 'bg-dark-surface' : 'bg-gray-50'
-                                                }`}>
+                                                <div className="h-32 rounded-2xl flex items-center justify-center mb-4 overflow-hidden bg-white/5 border border-white/10 backdrop-blur-sm">
                                                     {prod.image_url ? (
                                                         <img src={prod.image_url} alt={prod.name} className="max-h-full max-w-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display='none'; }} />
                                                     ) : (
-                                                        <span className="text-6xl">{prod.img || '🎁'}</span>
+                                                <span className="text-6xl">{prod.img || '🎁'}</span>
                                                     )}
                                                 </div>
-                                                <h4 className={`font-bold text-xs mb-1 line-clamp-2 ${darkMode ? 'text-dark-text' : 'text-gray-900'}`}>{prod.name}</h4>
-                                                <p className="text-[10px] text-brand-purple font-bold mt-1">
+                                                <h4 className="font-extrabold text-xs mb-1 line-clamp-2 text-white">{prod.name}</h4>
+                                                <p className="text-[11px] text-cyan-300 font-extrabold mt-1 drop-shadow-[0_0_5px_rgba(0,255,255,0.3)]">
                                                     {prod.price?.currency || 'LKR'} {(prod.price?.amount || prod.price)?.toLocaleString?.() ?? prod.price}
                                                 </p>
-                                                <div className="mt-3 inline-block px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[8px] font-bold uppercase rounded-full self-start">
+                                                <div className="mt-3 inline-block px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[8px] font-bold uppercase rounded-full self-start">
                                                     {prod.in_stock !== false ? 'Available Today' : 'Out of Stock'}
                                                 </div>
                                             </motion.div>
@@ -1612,17 +1623,15 @@ export default function ChatApp() {
                                 </motion.div>
 
                                 {/* Social Proof */}
-                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="w-full max-w-4xl text-left mt-4 mb-8">
-                                    <div className={`p-8 rounded-3xl border flex flex-col md:flex-row items-center gap-8 ${
-                                        darkMode ? 'bg-dark-card/50 border-dark-border' : 'bg-[#FDF2F4]/30 border-[#002F6C]/10'
-                                    }`}>
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="w-full max-w-6xl text-left mt-4 mb-8">
+                                    <div className={`p-8 rounded-3xl border flex flex-col md:flex-row items-center gap-8 bg-white/10 border-white/20 shadow-md backdrop-blur-md`}>
                                         <div className="flex-1 text-center md:text-left">
-                                            <h3 className={`text-3xl font-serif font-bold mb-2 ${darkMode ? 'text-dark-text' : 'text-[#002F6C]'}`}>4.8/5 Rating</h3>
-                                            <p className={`text-xs uppercase tracking-widest font-bold ${darkMode ? 'text-brand-purple-accent' : 'text-brand-purple'}`}>100+ Verified Reviews</p>
+                                            <h3 className="text-3xl font-extrabold mb-2 text-cyan-300 drop-shadow-[0_0_10px_rgba(0,255,255,0.5)]">4.8/5 Rating</h3>
+                                            <p className="text-xs uppercase tracking-widest font-extrabold text-pink-300 drop-shadow-[0_0_8px_rgba(244,114,182,0.4)]">100+ Verified Reviews</p>
                                         </div>
-                                        <div className={`flex-[2] text-sm italic border-l-2 pl-6 py-2 ${darkMode ? 'border-brand-purple-accent/30 text-dark-muted' : 'border-brand-purple/20 text-gray-600'}`}>
+                                        <div className="flex-[2] text-sm italic border-l-2 border-pink-400 pl-6 py-2 text-white/90">
                                             "Ordered flowers at 10 AM and delivered by lunch. The AI assistant made it incredibly easy. Amazing experience!"
-                                            <span className="block mt-2 font-bold not-italic text-xs text-brand-purple">— Sarah M. (Colombo 07)</span>
+                                            <span className="block mt-2 font-bold not-italic text-xs text-cyan-300">— Sarah M. (Colombo 07)</span>
                                         </div>
                                     </div>
                                 </motion.div>
@@ -1641,24 +1650,45 @@ export default function ChatApp() {
                                         initial={{ opacity: 0, y: 20, scale: 0.97 }}
                                         animate={{ opacity: 1, y: 0, scale: 1 }}
                                         transition={{ type: "spring", stiffness: 300, damping: 28 }}
-                                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                                >
-                                    <div className={`max-w-[80%] p-5 transition-colors duration-300 ${
-                                        msg.role === 'user'
-                                            ? 'bg-gradient-to-br from-[#8B6CE5] to-[#5939A1] text-white rounded-3xl rounded-br-lg shadow-lg shadow-[#8B6CE5]/20'
-                                            : darkMode
-                                                ? 'glass rounded-3xl rounded-bl-lg shadow-lg'
-                                                : 'glass-strong rounded-3xl rounded-bl-lg shadow-lg'
-                                    }`}>
+                                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-3`}
+                                    >
+                                        {/* Ayla Avatar */}
+                                        {msg.role !== 'user' && (
+                                            <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-full overflow-hidden border border-white/20 dark:border-dark-border shadow-[0_4px_12px_rgba(0,0,0,0.1)] bg-black/5 z-10 hidden sm:block mb-1">
+                                                <img src={aylaAvatar} alt="Ayla" className="w-full h-full object-cover" />
+                                            </div>
+                                        )}
+
+                                        <div className={`max-w-[85%] sm:max-w-[80%] md:max-w-4xl p-5 transition-all duration-300 relative ${
+                                            msg.role === 'user'
+                                                ? 'candy-user-bubble rounded-3xl rounded-br-lg'
+                                                : 'candy-bubble rounded-3xl rounded-bl-lg'
+                                        }`}>
+
+                                    {/* Attached Image */}
+                                    {msg.image && (
+                                        <div className="mb-3">
+                                            <img src={msg.image} alt="Attached" className="max-w-full h-auto rounded-xl max-h-48 object-cover shadow-sm border border-white/20" />
+                                        </div>
+                                    )}
 
                                     {/* Conversational text */}
                                     {msg.text && (
-                                        <div className={`prose prose-sm max-w-none ${
-                                            msg.role === 'user'
-                                                ? 'prose-invert'
-                                                : darkMode ? 'prose-invert' : ''
-                                        }`}>
+                                        <div className="prose prose-sm max-w-none !text-current">
                                             <ReactMarkdown>{msg.text}</ReactMarkdown>
+                                        </div>
+                                    )}
+
+                                    {/* ── Realistic Timestamp & Read Ticks ── */}
+                                    {msg.timestamp && (
+                                        <div className="flex justify-end items-center gap-1 mt-1 text-[10px] font-medium opacity-70">
+                                            <span>{formatMessageTime(msg.timestamp)}</span>
+                                            {msg.role === 'user' && (
+                                                <svg className="w-3.5 h-3.5 ml-0.5 text-current" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M18 6L7 17l-5-5"></path>
+                                                    <path d="M22 10l-5 5"></path>
+                                                </svg>
+                                            )}
                                         </div>
                                     )}
 
@@ -2204,6 +2234,42 @@ export default function ChatApp() {
                                                             </p>
                                                         </div>
                                                     </div>
+                                                    
+                                                    {/* Calendar Actions */}
+                                                    <div className={`pt-3 mt-1 border-t flex flex-col sm:flex-row gap-2 ${darkMode ? 'border-white/10' : 'border-[#7A1C2C]/10'}`}>
+                                                        <a 
+                                                            href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(reminderData.event_name || 'Event')}&dates=${reminderData.event_date?.replace(/-/g, '')}/${reminderData.event_date?.replace(/-/g, '')}&details=Kapruka%20Gift%20Reminder`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all ${
+                                                                darkMode ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white'
+                                                            }`}
+                                                        >
+                                                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm4.207 12.793-1.414 1.414L11 12.414V7h2v4.586l3.207 3.207z"></path></svg>
+                                                            Google Calendar
+                                                        </a>
+                                                        <button 
+                                                            onClick={() => {
+                                                                const eventName = reminderData.event_name || 'Event';
+                                                                const formattedDate = (reminderData.event_date || '').replace(/-/g, '');
+                                                                if(!formattedDate) return;
+                                                                const icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART;VALUE=DATE:${formattedDate}\nDTEND;VALUE=DATE:${formattedDate}\nSUMMARY:${eventName}\nDESCRIPTION:Kapruka Reminder\nEND:VEVENT\nEND:VCALENDAR`;
+                                                                const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+                                                                const link = document.createElement('a');
+                                                                link.href = window.URL.createObjectURL(blob);
+                                                                link.setAttribute('download', `${eventName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`);
+                                                                document.body.appendChild(link);
+                                                                link.click();
+                                                                document.body.removeChild(link);
+                                                            }}
+                                                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all ${
+                                                                darkMode ? 'bg-white/10 text-white hover:bg-white hover:text-black' : 'bg-gray-100 text-gray-700 hover:bg-gray-800 hover:text-white'
+                                                            }`}
+                                                        >
+                                                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M19 4h-2V2h-2v2H9V2H7v2H5c-1.103 0-2 .897-2 2v14c0 1.103.897 2 2 2h14c1.103 0 2-.897 2-2V6c0-1.103-.897-2-2-2zm.002 16H5V8h14l.002 12z"></path><path d="M11 10h2v5h-2zM7 10h2v5H7zM15 10h2v5h-2z"></path></svg>
+                                                            Apple / Outlook
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </motion.div>
                                         );
@@ -2277,7 +2343,7 @@ export default function ChatApp() {
                                     animate={{ opacity: 1, scale: 1 }}
                                     transition={{ delay: 0.1 * i }}
                                     onClick={() => sendMessage(resolveChipMessage(action))}
-                                    className={`px-3.5 py-2 rounded-full text-[11px] font-semibold transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer border ${
+                                    className={`px-3.5 py-2 rounded-full text-[11px] font-semibold transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer gum-control ${
                                         darkMode
                                             ? 'bg-dark-card border-dark-border text-dark-muted hover:bg-brand-purple/15 hover:text-brand-purple-accent hover:border-brand-purple/40'
                                             : 'bg-white border-gray-200 text-gray-600 hover:bg-brand-purple hover:text-white hover:border-brand-purple shadow-sm'
@@ -2296,7 +2362,7 @@ export default function ChatApp() {
                 )}
 
                 {/* ── Input Area ── */}
-                <div className="p-4 md:p-6 pt-0 relative z-10">
+                <div className="p-4 md:p-6 pt-0 relative z-10 w-full max-w-7xl mx-auto">
 
                     {/* Image Preview Thumbnail */}
                     <AnimatePresence>
@@ -2320,51 +2386,89 @@ export default function ChatApp() {
                         )}
                     </AnimatePresence>
 
-                    <form onSubmit={sendMessage} className="relative flex items-center w-full">
-                        <input 
-                            type="file" 
-                            ref={fileInputRef} 
-                            onChange={handleImageSelect} 
-                            accept="image/*" 
-                            className="hidden" 
-                        />
-                        <button type="button" onClick={() => fileInputRef.current?.click()} className={`absolute left-2 p-2 rounded-full transition-colors cursor-pointer ${darkMode ? 'text-dark-muted hover:text-brand-purple-accent hover:bg-white/10' : 'text-gray-400 hover:text-brand-purple hover:bg-brand-purple/10'}`}>
-                            <AttachmentIcon />
-                        </button>
-                        <input
-                            type="text"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            placeholder={translations[currentLang].inputPlaceholder}
-                            className={`w-full py-4 pl-12 pr-[100px] rounded-full focus-glow transition-all duration-300 text-sm placeholder:tracking-wide shadow-sm ${
-                                darkMode
-                                    ? 'bg-dark-card/80 text-dark-text placeholder:text-dark-muted border border-dark-border focus:border-brand-purple/50'
-                                    : 'bg-white text-gray-700 placeholder:text-gray-400 border border-gray-200 focus:border-brand-purple/50'
-                            }`}
-                            disabled={isLoading}
-                        />
-                        <div className="absolute right-1.5 flex items-center gap-1">
-                            <button 
-                                type="button" 
-                                onClick={toggleRecording} 
-                                className={`p-2 rounded-full transition-all duration-300 cursor-pointer ${
-                                    isRecording 
-                                        ? 'bg-red-500 text-white animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)]' 
-                                        : darkMode ? 'text-dark-muted hover:text-dark-text hover:bg-white/10' : 'text-gray-400 hover:text-brand-purple hover:bg-brand-purple/10'
-                                }`}
-                                title={isRecording ? 'Listening...' : 'Voice Input'}
-                            >
-                                <MicrophoneIcon />
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={isLoading || !input.trim()}
-                                className="w-10 h-10 bg-gradient-to-br from-brand-purple to-brand-purple-dark text-white rounded-full hover:shadow-lg hover:shadow-brand-purple/25 disabled:opacity-40 disabled:hover:shadow-none transition-all duration-300 active:scale-95 flex items-center justify-center cursor-pointer"
-                            >
-                                <SendIcon />
-                            </button>
+                    {isRecording ? (
+                        <div 
+                            onClick={toggleRecording}
+                            className="relative flex items-center w-full h-[54px] bg-[#0A0A0A] rounded-full border border-green-500/40 shadow-[0_0_20px_rgba(34,197,94,0.15)] px-5 z-20 overflow-hidden cursor-pointer hover:border-green-400 transition-colors"
+                            title="Click to cancel"
+                        >
+                            <span className="text-green-400 font-bold text-sm tracking-wide min-w-max mr-4 z-10 drop-shadow-[0_0_8px_rgba(34,197,94,0.8)] overflow-hidden text-ellipsis whitespace-nowrap max-w-[200px] sm:max-w-[400px]">
+                                {liveTranscript || "Listening..."}
+                            </span>
+                            <div className="flex items-center gap-[5px] h-8 flex-1 opacity-70 pointer-events-none overflow-hidden mask-image-linear-gradient-to-r">
+                                {[
+                                    { h: "12px", d: 0.0 }, { h: "20px", d: 0.2 }, { h: "10px", d: 0.4 }, { h: "24px", d: 0.1 },
+                                    { h: "16px", d: 0.5 }, { h: "8px", d: 0.3 }, { h: "22px", d: 0.6 }, { h: "14px", d: 0.2 },
+                                    { h: "28px", d: 0.0 }, { h: "12px", d: 0.4 }, { h: "20px", d: 0.7 }, { h: "10px", d: 0.1 },
+                                    { h: "24px", d: 0.5 }, { h: "16px", d: 0.3 }, { h: "8px", d: 0.6 }, { h: "22px", d: 0.2 },
+                                    { h: "14px", d: 0.5 }, { h: "26px", d: 0.1 }, { h: "10px", d: 0.4 }, { h: "18px", d: 0.7 },
+                                    { h: "12px", d: 0.3 }, { h: "24px", d: 0.6 }, { h: "8px", d: 0.1 }, { h: "16px", d: 0.5 },
+                                    { h: "20px", d: 0.2 }, { h: "10px", d: 0.4 }, { h: "26px", d: 0.0 }, { h: "14px", d: 0.3 },
+                                    { h: "22px", d: 0.6 }, { h: "12px", d: 0.1 }, { h: "18px", d: 0.5 }, { h: "8px", d: 0.2 }
+                                ].map((bar, i) => (
+                                    <motion.div 
+                                        key={i}
+                                        animate={{ height: ["6px", bar.h, "6px"] }} 
+                                        transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: bar.d }} 
+                                        className="w-1.5 bg-green-400 rounded-full flex-shrink-0" 
+                                    />
+                                ))}
+                            </div>
                         </div>
-                    </form>
+                    ) : (
+                        <form onSubmit={sendMessage} className="relative flex items-center w-full z-20">
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                onChange={handleImageSelect} 
+                                accept="image/*" 
+                                className="hidden" 
+                            />
+                            <button type="button" onClick={() => fileInputRef.current?.click()} className={`absolute left-2 p-2 rounded-full transition-colors cursor-pointer ${darkMode ? 'text-white/60 hover:text-cyan-300 hover:bg-white/10' : 'text-brand-purple/70 hover:text-brand-purple hover:bg-brand-purple/10'}`}>
+                                <AttachmentIcon />
+                            </button>
+                            <input
+                                type="text"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                placeholder={translations[currentLang].inputPlaceholder}
+                                className={`w-full py-4 pl-12 pr-[100px] rounded-full focus-glow transition-all duration-300 text-sm placeholder:tracking-wide neu-input ${
+                                    darkMode
+                                        ? 'bg-dark-card/80 text-dark-text placeholder:text-dark-muted border border-dark-border focus:border-brand-purple/50'
+                                        : 'bg-white text-gray-700 placeholder:text-gray-400 border border-gray-200 focus:border-brand-purple/50'
+                                }`}
+                                disabled={isLoading}
+                            />
+                            <div className="absolute right-1.5 flex items-center gap-1">
+                                <button 
+                                    type="button" 
+                                    onClick={toggleRecording} 
+                                    className={`p-2 rounded-full transition-all duration-300 cursor-pointer flex items-center justify-center w-10 h-10 ${
+                                        darkMode ? 'text-white/60 hover:text-pink-300 hover:bg-white/10 border border-transparent' : 'text-brand-purple/70 hover:text-pink-500 hover:bg-brand-purple/10 border border-transparent'
+                                    }`}
+                                    title="Voice Input"
+                                >
+                                    <MicrophoneIcon />
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isLoading || !input.trim()}
+                                    className={`w-10 h-10 rounded-full transition-all duration-300 active:scale-95 flex items-center justify-center cursor-pointer shadow-md ${
+                                        (!isLoading && input.trim())
+                                            ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 hover:shadow-[0_0_15px_rgba(236,72,153,0.6)] text-white'
+                                            : darkMode
+                                                ? 'bg-[#252D44]/60 text-dark-muted border border-[#252D44] cursor-not-allowed opacity-50'
+                                                : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed opacity-50'
+                                    }`}
+                                >
+                                    <SendIcon />
+                                </button>
+                            </div>
+                        </form>
+                    )}
+                    <p className={`text-center text-[10px] mt-2.5 font-medium tracking-wide ${darkMode ? 'text-dark-muted' : 'text-white/40'}`}>
+                        Ayla is an AI Agent and can make mistakes. Please double-check before use.
+                    </p>
                 </div>
             </div>
 
