@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use App\Models\ConciergeLog;
 
 class GiftConciergeController extends Controller
 {
@@ -359,6 +360,7 @@ class GiftConciergeController extends Controller
                 // Since we manually extracted and merged it, we can pass $cleanPayloadObj directly. 
                 // finalizeAIResponse handles clean payloads gracefully via the fallback in extractToolPayload.
                 $finalResponse = $this->finalizeAIResponse($userMessage, $history, $toolName, $mergedArguments, $cleanPayloadObj, $imageBase64, $imageMimeType, $originalModelContent);
+                $this->logInteraction($request->session()->getId(), $userMessage, $toolName, $mergedArguments['q'] ?? null, $finalResponse['text'] ?? null);
                 return response()->json($finalResponse);
             }
         }
@@ -368,11 +370,29 @@ class GiftConciergeController extends Controller
         $arguments = $toolCalls[0]['args'] ?? [];
         $toolResult = $this->executeNodeTool($toolName, $arguments);
         $finalResponse = $this->finalizeAIResponse($userMessage, $history, $toolName, $arguments, $toolResult, $imageBase64, $imageMimeType, $originalModelContent);
+        $this->logInteraction($request->session()->getId(), $userMessage, $toolName, $arguments['q'] ?? null, $finalResponse['text'] ?? null);
         return response()->json($finalResponse);
     }
     
-    return response()->json(['text' => $result['candidates'][0]['content']['parts'][0]['text'] ?? 'No text generated.']);
+    $textResponse = $result['candidates'][0]['content']['parts'][0]['text'] ?? 'No text generated.';
+    $this->logInteraction($request->session()->getId(), $userMessage, null, null, $textResponse);
+    return response()->json(['text' => $textResponse]);
 }
+
+    private function logInteraction(?string $sessionId, string $userMessage, ?string $toolCalled = null, ?string $searchQuery = null, ?string $aiResponse = null): void
+    {
+        try {
+            ConciergeLog::create([
+                'session_id' => $sessionId,
+                'user_message' => $userMessage,
+                'tool_called' => $toolCalled,
+                'search_query' => $searchQuery,
+                'ai_response' => $aiResponse,
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to log concierge interaction: " . $e->getMessage());
+        }
+    }
 
     /**
      * Define your tools schema to teach the LLM what it can do
