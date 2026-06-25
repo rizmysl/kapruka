@@ -8,4 +8,4 @@ Route::get('/', function () {
 });
 
 // Your new AI Chat endpoint
-Route::post('/chat/message', [GiftConciergeController::class, 'chat']);
+Route::post('/chat/message', [GiftConciergeController::class, 'chat'])->middleware('throttle:30,1');

@@ -81,6 +81,7 @@ const getSuggestionsForTool = (tool: string | undefined): string[] => {
     if (!tool) return ['🎁 Find birthday gifts', '💐 Send flowers', '🎂 Order a cake', '📦 Track my order'];
     switch (tool) {
         case 'kapruka_search_products':
+        case 'kapruka_semantic_search':
             return ['🔍 Refine search', '📍 Check delivery', '🛒 Add to cart & checkout', '🔀 Show me something different'];
         case 'kapruka_get_product':
             return ['🛒 Add to cart', '📍 Check delivery to Colombo', '💬 Tell me more about this', '🔍 Find similar products'];
@@ -693,9 +694,14 @@ export default function ChatApp() {
         try {
             const isDev = import.meta.env.MODE === 'development';
             const apiUrl = isDev ? '/api-proxy/chat/message' : (import.meta.env.VITE_API_URL + '/chat/message');
+            const token = import.meta.env.VITE_CHAT_TOKEN || '';
             const response = await fetch(apiUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'Accept': 'application/json',
+                    'X-Chat-Token': token
+                },
                 body: JSON.stringify({ 
                     message: userText, 
                     use_mock: useMock, 
@@ -737,11 +743,11 @@ export default function ChatApp() {
 
             // Update contextual suggestion chips + capture last search context
             setSuggestedActions(getSuggestionsForTool(data.tool_called));
-            if (data.tool_called === 'kapruka_search_products' && data.raw_data) {
+            if ((data.tool_called === 'kapruka_search_products' || data.tool_called === 'kapruka_semantic_search') && data.raw_data) {
                 const parsed = getParsedData(data.raw_data);
                 const productNames = (parsed?.results || []).slice(0, 6).map((p: any) => p.name).filter(Boolean);
                 const appliedQuery = parsed?.applied_filters?.q || userText;
-                setLastSearchContext({ query: appliedQuery, products: productNames, lastTool: 'kapruka_search_products' });
+                setLastSearchContext({ query: appliedQuery, products: productNames, lastTool: data.tool_called });
             } else if (data.tool_called) {
                 setLastSearchContext(prev => ({ ...prev, lastTool: data.tool_called }));
             }
@@ -1693,7 +1699,7 @@ export default function ChatApp() {
                                     )}
 
                                     {/* ── 1. Search Results Grid ── */}
-                                    {msg.tool === 'kapruka_search_products' && msg.raw_data && (() => {
+                                    {(msg.tool === 'kapruka_search_products' || msg.tool === 'kapruka_semantic_search') && msg.raw_data && (() => {
                                         const searchData = getParsedData(msg.raw_data);
                                         const resultsArray = Array.isArray(searchData) ? searchData : (searchData?.results || []);
                                         

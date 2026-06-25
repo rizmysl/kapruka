@@ -19,6 +19,14 @@ class GiftConciergeController extends Controller
 
   public function chat(Request $request)
 {
+    $chatToken = $request->header('X-Chat-Token');
+    $expectedToken = env('KAPRUKA_CHAT_TOKEN');
+    
+    // Validate custom chat token
+    if (!$chatToken || $chatToken !== $expectedToken) {
+        return response()->json(['error' => 'Unauthorized chat token'], 401);
+    }
+
     $request->validate([
         'message' => 'required|string',
         'history' => 'nullable|array'
@@ -266,117 +274,45 @@ class GiftConciergeController extends Controller
 
     $userMessage = $request->input('message');
     $history = $request->input('history', []);
-    $imageBase64 = $request->input('image');
-    $imageMimeType = $request->input('mime_type', 'image/jpeg');
-
-    $llmPayload = $this->prepareLLMPayload($userMessage, $history, $imageBase64, $imageMimeType);
 
     try {
-        // Send request to Gemini
-        $llmResponse = Http::withHeaders([
-            'x-goog-api-key' => env('GEMINI_API_KEY'),
-            'Content-Type' => 'application/json'
-        ])->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', $llmPayload);
+        // Send the request to our new Python Orchestrator Agent
+        $pythonResponse = Http::withHeaders([
+            'X-Agent-API-Key' => env('AGENT_API_KEY', 'default-agent-key')
+        ])->timeout(60)->post('http://localhost:8001/chat', [
+            'message' => $userMessage,
+            'history' => $history
+        ]);
 
-        // If Google returns an error code (400, 401, 403, etc.)
-        if ($llmResponse->failed()) {
+        if ($pythonResponse->failed()) {
             return response()->json([
-                'debug_source' => 'Gemini API Error Response',
-                'status_code' => $llmResponse->status(),
-                'error_body' => $llmResponse->json() ?? $llmResponse->body()
-            ], $llmResponse->status());
+                'debug_source' => 'Python Agent Error',
+                'status_code' => $pythonResponse->status(),
+                'error_body' => $pythonResponse->json() ?? $pythonResponse->body()
+            ], $pythonResponse->status());
         }
 
-    } catch (\Exception $e) {
-        // If your server can't even reach the internet or has a SSL config issue
+        $result = $pythonResponse->json();
+        $textResponse = $result['text'] ?? 'No response received from agent.';
+
+        $toolCalled = $result['tool_called'] ?? null;
+        $rawData = $result['raw_data'] ?? null;
+
+        // Log the interaction
+        $this->logInteraction($request->session()->getId(), $userMessage, $toolCalled ?? 'python_orchestrator', null, $textResponse);
+
         return response()->json([
-            'debug_source' => 'Laravel Local Connection Exception',
+            'text' => $textResponse,
+            'tool_called' => $toolCalled,
+            'raw_data' => $rawData
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'debug_source' => 'Laravel Local Connection Exception (Cannot reach Python Agent)',
             'exception_message' => $e->getMessage()
         ], 500);
     }
-
-    // ... rest of your code remains the same ...
-    $result = $llmResponse->json();
-    $parts = $result['candidates'][0]['content']['parts'] ?? [];
-    // Also capture the raw model content to forward back (preserves thought_signature)
-    $originalModelContent = $result['candidates'][0]['content'] ?? ['role' => 'model', 'parts' => $parts];
-
-    $toolCalls = [];
-    foreach ($parts as $part) {
-        if (isset($part['functionCall'])) {
-            $toolCalls[] = $part['functionCall'];
-        }
-    }
-
-    if (count($toolCalls) > 0) {
-        // If they are ALL kapruka_search_products, we can merge them
-        $allSearches = true;
-        foreach ($toolCalls as $tc) {
-            if ($tc['name'] !== 'kapruka_search_products') {
-                $allSearches = false;
-                break;
-            }
-        }
-
-        if ($allSearches && count($toolCalls) > 1) {
-            $mergedResults = [];
-            $toolName = 'kapruka_search_products';
-            $mergedArguments = ['q' => ''];
-            $cleanPayloadObj = [];
-
-            foreach ($toolCalls as $idx => $tc) {
-                $args = $tc['args'] ?? [];
-                $rawRes = $this->executeNodeTool($tc['name'], $args);
-                $cleanRes = $this->extractToolPayload($rawRes);
-                
-                if ($idx === 0) {
-                    $cleanPayloadObj = $cleanRes; // Start with the first clean payload
-                    $mergedArguments['q'] .= $args['q'] ?? '';
-                } else {
-                    $mergedArguments['q'] .= ' & ' . ($args['q'] ?? '');
-                }
-                
-                if (isset($cleanRes['results']) && is_array($cleanRes['results'])) {
-                    $mergedResults = array_merge($mergedResults, $cleanRes['results']);
-                }
-            }
-            
-            if (!empty($cleanPayloadObj)) {
-                // Deduplicate merged results by ID
-                $uniqueResults = [];
-                $ids = [];
-                foreach ($mergedResults as $item) {
-                    if (isset($item['id']) && !in_array($item['id'], $ids)) {
-                        $ids[] = $item['id'];
-                        $uniqueResults[] = $item;
-                    }
-                }
-                $cleanPayloadObj['results'] = $uniqueResults;
-                // Remove 'no products found' text if we successfully merged products
-                if (count($uniqueResults) > 0) {
-                    $cleanPayloadObj['text_content'] = "Merged " . count($uniqueResults) . " products";
-                }
-
-                // Since we manually extracted and merged it, we can pass $cleanPayloadObj directly. 
-                // finalizeAIResponse handles clean payloads gracefully via the fallback in extractToolPayload.
-                $finalResponse = $this->finalizeAIResponse($userMessage, $history, $toolName, $mergedArguments, $cleanPayloadObj, $imageBase64, $imageMimeType, $originalModelContent);
-                $this->logInteraction($request->session()->getId(), $userMessage, $toolName, $mergedArguments['q'] ?? null, $finalResponse['text'] ?? null);
-                return response()->json($finalResponse);
-            }
-        }
-
-        // Fallback: Just execute the first tool call
-        $toolName = $toolCalls[0]['name'];
-        $arguments = $toolCalls[0]['args'] ?? [];
-        $toolResult = $this->executeNodeTool($toolName, $arguments);
-        $finalResponse = $this->finalizeAIResponse($userMessage, $history, $toolName, $arguments, $toolResult, $imageBase64, $imageMimeType, $originalModelContent);
-        $this->logInteraction($request->session()->getId(), $userMessage, $toolName, $arguments['q'] ?? null, $finalResponse['text'] ?? null);
-        return response()->json($finalResponse);
-    }
-    
-    $textResponse = $result['candidates'][0]['content']['parts'][0]['text'] ?? 'No text generated.';
-    $this->logInteraction($request->session()->getId(), $userMessage, null, null, $textResponse);
-    return response()->json(['text' => $textResponse]);
 }
 
     private function logInteraction(?string $sessionId, string $userMessage, ?string $toolCalled = null, ?string $searchQuery = null, ?string $aiResponse = null): void
