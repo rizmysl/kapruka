@@ -257,3 +257,24 @@ body {
   color: #E0FFFF;
   box-shadow: 0 4px 16px rgba(0, 255, 255, 0.15);
 }
+
+/* ─── Hackathon Wow Animations ─── */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(255, 105, 180, 0.3), 0 0 10px rgba(0, 255, 255, 0.1);
+    border-color: rgba(255, 105, 180, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(255, 105, 180, 0.6), 0 0 25px rgba(0, 255, 255, 0.3);
+    border-color: rgba(0, 255, 255, 0.6);
+  }
+}
+
+.pulse-glow-chip {
+  animation: pulse-glow 2.5s infinite ease-in-out;
+}
+
+.pulse-glow-chip:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 0 20px rgba(255, 105, 180, 0.8), 0 0 35px rgba(0, 255, 255, 0.5);
+}
