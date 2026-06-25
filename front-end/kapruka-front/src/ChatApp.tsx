@@ -693,9 +693,14 @@ export default function ChatApp() {
         try {
             const isDev = import.meta.env.MODE === 'development';
             const apiUrl = isDev ? '/api-proxy/chat/message' : (import.meta.env.VITE_API_URL + '/chat/message');
+            const token = import.meta.env.VITE_CHAT_TOKEN || '';
             const response = await fetch(apiUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'Accept': 'application/json',
+                    'X-Chat-Token': token
+                },
                 body: JSON.stringify({ 
                     message: userText, 
                     use_mock: useMock, 

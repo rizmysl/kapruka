@@ -19,6 +19,14 @@ class GiftConciergeController extends Controller
 
   public function chat(Request $request)
 {
+    $chatToken = $request->header('X-Chat-Token');
+    $expectedToken = env('KAPRUKA_CHAT_TOKEN');
+    
+    // Validate custom chat token
+    if (!$chatToken || $chatToken !== $expectedToken) {
+        return response()->json(['error' => 'Unauthorized chat token'], 401);
+    }
+
     $request->validate([
         'message' => 'required|string',
         'history' => 'nullable|array'
@@ -355,6 +363,17 @@ class GiftConciergeController extends Controller
                 // Remove 'no products found' text if we successfully merged products
                 if (count($uniqueResults) > 0) {
                     $cleanPayloadObj['text_content'] = "Merged " . count($uniqueResults) . " products";
+                } else {
+                    // Merged searches yielded no results, short circuit!
+                    $lang = $this->detectLanguage($userMessage);
+                    $query = $mergedArguments['q'] ?? '';
+                    $text = $this->getNoResultsText($lang, $query);
+                    $this->logInteraction($request->session()->getId(), $userMessage, $toolName, $query, $text);
+                    return response()->json([
+                        'text' => $text,
+                        'tool_called' => $toolName,
+                        'raw_data' => $cleanPayloadObj
+                    ]);
                 }
 
                 // Since we manually extracted and merged it, we can pass $cleanPayloadObj directly. 
@@ -369,6 +388,24 @@ class GiftConciergeController extends Controller
         $toolName = $toolCalls[0]['name'];
         $arguments = $toolCalls[0]['args'] ?? [];
         $toolResult = $this->executeNodeTool($toolName, $arguments);
+
+        // Check if single search query returned no results, if so short circuit!
+        if ($toolName === 'kapruka_search_products') {
+            $cleanPayload = $this->extractToolPayload($toolResult);
+            $results = $cleanPayload['results'] ?? [];
+            if (is_array($results) && empty($results)) {
+                $lang = $this->detectLanguage($userMessage);
+                $query = $arguments['q'] ?? '';
+                $text = $this->getNoResultsText($lang, $query);
+                $this->logInteraction($request->session()->getId(), $userMessage, $toolName, $query, $text);
+                return response()->json([
+                    'text' => $text,
+                    'tool_called' => $toolName,
+                    'raw_data' => $cleanPayload
+                ]);
+            }
+        }
+
         $finalResponse = $this->finalizeAIResponse($userMessage, $history, $toolName, $arguments, $toolResult, $imageBase64, $imageMimeType, $originalModelContent);
         $this->logInteraction($request->session()->getId(), $userMessage, $toolName, $arguments['q'] ?? null, $finalResponse['text'] ?? null);
         return response()->json($finalResponse);
@@ -1148,5 +1185,23 @@ class GiftConciergeController extends Controller
         }
         
         return 'en';
+    }
+
+    private function getNoResultsText(string $lang, string $query): string
+    {
+        $itemLabel = !empty($query) ? ucfirst($query) : '';
+        if ($lang === 'si') {
+            return "සමාවෙන්න! මට ඒ සඳහා ගැලපෙන භාණ්ඩ කිසිවක් සොයාගත නොහැකි විය. කරුණාකර වෙනත් නමකින් උත්සාහ කරන්න.";
+        } elseif ($lang === 'ta') {
+            return "மன்னிக்கவும்! இதற்கான எந்தப் பொருட்களையும் என்னால் கண்டுபிடிக்க முடியவில்லை. தயவுசெய்து வேறு பெயரில் முயற்சிக்கவும்.";
+        } elseif ($lang === 'singlish') {
+            $label = $itemLabel ?: 'ekata';
+            return "Aiyo! Sorry anee, mata \"{$label}\" gaena match wena mukuth hoyaganna bari una. Wena widihakata try karamuda? 🙏";
+        } elseif ($lang === 'tanglish') {
+            $label = $itemLabel ?: 'ithai';
+            return "Aiyo! Sorry, \"{$label}\" ku match aana products eduvum kidaikala. Vera perula thedi paarkalama? 🙏";
+        } else {
+            return "Aiyo! I'm so sorry, but I couldn't find any products matching " . ($query ? "\"{$query}\"" : "your search") . " right now. Could we try a broader search or different keywords?";
+        }
     }
 }
