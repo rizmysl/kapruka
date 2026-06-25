@@ -361,9 +361,29 @@ export default function ChatApp() {
         utterance.lang = lang;
 
         const voices = synthRef.current.getVoices();
-        const matchedVoice = voices.find(v => v.lang.startsWith(lang));
-        if (matchedVoice) {
-            utterance.voice = matchedVoice;
+        const langVoices = voices.filter(v => v.lang.toLowerCase().replace('_', '-').startsWith(lang.toLowerCase()));
+        
+        // Heuristic function to prioritize female voices to match Ayla's persona
+        const isFemaleVoice = (name: string) => {
+            const lowerName = name.toLowerCase();
+            if (lowerName.includes('female') || lowerName.includes('woman') || lowerName.includes('girl')) return true;
+            const femaleNames = [
+                'samantha', 'tessa', 'victoria', 'karen', 'moira', 'hazel', 'veena', 'fiona', 
+                'zira', 'susan', 'catherine', 'heera', 'priya', 'kalpana', 'ananya', 'hema',
+                'haruka', 'kyoko', 'mei-jia', 'sin-ji', 'kanya', 'laila', 'yolda', 'alice', 
+                'anna', 'elena', 'joana', 'laura', 'milena', 'nora', 'sara', 'zofia'
+            ];
+            return femaleNames.some(fn => lowerName.includes(fn));
+        };
+
+        let chosenVoice = langVoices.find(v => isFemaleVoice(v.name));
+        if (!chosenVoice) {
+            // Fallback to any voice matching the language
+            chosenVoice = langVoices[0];
+        }
+
+        if (chosenVoice) {
+            utterance.voice = chosenVoice;
         }
 
         utterance.onend = () => {
