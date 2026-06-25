@@ -11,10 +11,12 @@ class GiftConciergeController extends Controller
 {
     // The local Node bridge endpoint running your MCP server
     private string $nodeBridgeUrl;
+    private string $geminiModel;
 
     public function __construct()
     {
         $this->nodeBridgeUrl = env('NODE_BRIDGE_URL', 'http://localhost:5001/call-tool');
+        $this->geminiModel = env('GEMINI_MODEL', 'gemini-1.5-flash');
     }
 
   public function chat(Request $request)
@@ -284,7 +286,7 @@ class GiftConciergeController extends Controller
         $llmResponse = Http::withHeaders([
             'x-goog-api-key' => env('GEMINI_API_KEY'),
             'Content-Type' => 'application/json'
-        ])->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', $llmPayload);
+        ])->post('https://generativelanguage.googleapis.com/v1beta/models/' . $this->geminiModel . ':generateContent', $llmPayload);
 
         // If Google returns an error code (400, 401, 403, etc.)
         if ($llmResponse->failed()) {
@@ -822,7 +824,7 @@ class GiftConciergeController extends Controller
         $llmResponse = Http::withHeaders([
             'x-goog-api-key' => env('GEMINI_API_KEY'),
             'Content-Type' => 'application/json'
-        ])->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', [
+        ])->post('https://generativelanguage.googleapis.com/v1beta/models/' . $this->geminiModel . ':generateContent', [
             'contents' => $contents,
             'systemInstruction' => $this->getSystemInstruction()
         ]);
