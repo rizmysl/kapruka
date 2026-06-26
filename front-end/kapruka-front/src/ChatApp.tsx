@@ -1136,7 +1136,7 @@ export default function ChatApp() {
                         <div className={`p-3 rounded-xl text-[10px] border ${
                             darkMode ? 'bg-white/5 text-dark-muted border border-dark-border' : 'bg-white/5 text-white/60 border-white/10'
                         }`}>
-                            <p className="font-bold mb-0.5 text-lg gradient-text">Hackathon 2026</p>
+                            <p className="font-bold mb-0.5 text-lg gradient-text">AYLA BOT 2026</p>
                             <p className="font-medium text-white/75">Powered by Gemini · MCP · Kapruka</p>
                         </div>
                     </div>
