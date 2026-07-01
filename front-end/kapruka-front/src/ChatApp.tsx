@@ -12,6 +12,10 @@ import {
 } from './components/icons';
 
 import aylaAvatar from './assets/ayla_avatar.png';
+import precisionModeMusic from './assets/Precision_Mode.mp3';
+import amberEyesMusic from './assets/Amber_Eyes_Awake.mp3';
+import SplashScreen from './components/common/SplashScreen';
+
 
 interface RawData {
   id?: string;
@@ -71,7 +75,7 @@ const getInitialWelcomeMsg = (): Message => {
     const occasionLine = occasion ? `\n\n✨ *${occasion}* — perfect time to send something special!` : '';
     return {
         role: 'bot',
-        text: `${getDynamicGreeting()} I'm **Ayla**, your Kapruka AI Gift Concierge — powered by Gemini & MCP. 🎁${occasionLine}\n\nTell me who you're shopping for and I'll find the perfect gift!`,
+        text: `${getDynamicGreeting()} I'm **Ayla**, your Kapruka AI Gift Concierge. 🎁${occasionLine}\n\nTell me who you're shopping for and I'll find the perfect gift!`,
         timestamp: Date.now()
     };
 };
@@ -101,6 +105,91 @@ const getSuggestionsForTool = (tool: string | undefined): string[] => {
 
 export default function ChatApp() {
     const [currentLang, setCurrentLang] = useState<'en' | 'si' | 'ta'>('en');
+    
+    // ── Splash & Audio States ──
+    const [showSplash, setShowSplash] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('kapruka-splash-played') !== 'true';
+        }
+        return true;
+    });
+    const [musicPlaying, setMusicPlaying] = useState(false);
+    const [activeTrack, setActiveTrack] = useState<'precision' | 'amber'>('precision');
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const playCountRef = useRef(0);
+
+    const playTrack = (trackKey: 'precision' | 'amber') => {
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current = null;
+        }
+
+        const file = trackKey === 'precision' ? precisionModeMusic : amberEyesMusic;
+        const audio = new Audio(file);
+        audio.volume = 0.35;
+
+        audio.addEventListener('ended', () => {
+            if (trackKey === 'precision') {
+                playCountRef.current += 1;
+                if (playCountRef.current < 2) {
+                    audio.play().catch(err => console.error("Error looping music:", err));
+                } else {
+                    setMusicPlaying(false);
+                }
+            } else {
+                setMusicPlaying(false);
+                setActiveTrack('precision');
+                audioRef.current = null;
+            }
+        });
+
+        audioRef.current = audio;
+        if (trackKey === 'precision') {
+            playCountRef.current = 0;
+        }
+        audio.play().catch(err => console.error("Error playing audio track:", err));
+        setActiveTrack(trackKey);
+        setMusicPlaying(true);
+    };
+
+    const handleEnterExperience = (enableSound: boolean) => {
+        if (enableSound) {
+            playTrack('precision');
+        }
+        setShowSplash(false);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('kapruka-splash-played', 'true');
+        }
+    };
+
+    const handleToggleMusic = () => {
+        if (!audioRef.current) {
+            playTrack(activeTrack);
+            return;
+        }
+
+        if (musicPlaying) {
+            audioRef.current.pause();
+            setMusicPlaying(false);
+        } else {
+            if (activeTrack === 'precision' && playCountRef.current >= 2) {
+                playTrack('precision');
+            } else {
+                audioRef.current.play().catch(err => console.error("Error playing music:", err));
+                setMusicPlaying(true);
+            }
+        }
+    };
+
+    useEffect(() => {
+        return () => {
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current = null;
+            }
+        };
+    }, []);
+
     // ── Chat sessions ──
     const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => {
         const initial: ChatSession = { id: Date.now().toString(), title: 'Chat 1', messages: [getInitialWelcomeMsg()], createdAt: Date.now() };
@@ -865,7 +954,23 @@ export default function ChatApp() {
     }, [sendMessage]);
 
     return (
-        <div className={`flex h-[100dvh] w-full overflow-hidden font-sans transition-colors duration-300 ${darkMode ? 'bg-dark-bg' : 'bg-gradient-to-br from-indigo-50 via-white to-purple-50 animate-mesh'}`}>
+        <>
+            <AnimatePresence mode="wait">
+                {showSplash && (
+                    <motion.div
+                        key="splash"
+                        initial={{ opacity: 1 }}
+                        exit={{ opacity: 0, scale: 1.05 }}
+                        transition={{ duration: 0.8, ease: "easeInOut" }}
+                        className="fixed inset-0 z-[100]"
+                    >
+                        <SplashScreen onEnter={handleEnterExperience} />
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            <div className={`flex h-[100dvh] w-full overflow-hidden font-sans transition-colors duration-300 ${darkMode ? 'bg-dark-bg' : 'bg-gradient-to-br from-indigo-50 via-white to-purple-50 animate-mesh'}`}>
+
 
             {/* ═══════════════ MOBILE SIDEBAR BACKDROP ═══════════════ */}
             {mobileSidebarOpen && (
@@ -1129,6 +1234,53 @@ export default function ChatApp() {
                     </div>
                     )}
                 </div>
+                
+                {/* Promotional Audio Card */}
+                {!sidebarCollapsed && (
+                    <div className="px-4 mb-4">
+                        <div className={`p-3.5 rounded-2xl border transition-all duration-300 ${
+                            activeTrack === 'amber' && musicPlaying
+                                ? 'bg-gradient-to-br from-amber-500/15 via-orange-600/5 to-transparent border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+                                : darkMode 
+                                    ? 'bg-white/5 border border-dark-border text-dark-text hover:bg-white/[0.08]' 
+                                    : 'bg-white/10 border border-white/20 text-white hover:bg-white/15'
+                        }`}>
+                            <div className="flex items-center justify-between gap-2.5">
+                                <div className="min-w-0">
+                                    <span className="inline-block text-[8px] font-extrabold tracking-wider uppercase text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-md mb-1.5">
+                                        Featured Track
+                                    </span>
+                                    <p className="text-xs font-bold truncate">Amber Eyes Awake</p>
+                                    <p className={`text-[10px] truncate mt-0.5 ${darkMode ? 'text-dark-muted' : 'text-cyan-100/70 font-medium'}`}>
+                                        Ayla Promo Theme · 1:00
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => activeTrack === 'amber' && musicPlaying ? handleToggleMusic() : playTrack('amber')}
+                                    className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 cursor-pointer transition-all duration-300 shadow-sm ${
+                                        activeTrack === 'amber' && musicPlaying
+                                            ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 scale-105 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
+                                            : darkMode
+                                                ? 'bg-dark-card border border-dark-border hover:border-brand-purple hover:text-brand-purple-accent text-white'
+                                                : 'bg-white/10 border border-white/20 hover:bg-white/20 text-white'
+                                    }`}
+                                    title={activeTrack === 'amber' && musicPlaying ? "Pause Soundtrack" : "Play Soundtrack"}
+                                >
+                                    {activeTrack === 'amber' && musicPlaying ? (
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <line x1="18" y1="5" x2="18" y2="19"></line>
+                                            <line x1="6" y1="5" x2="6" y2="19"></line>
+                                        </svg>
+                                    ) : (
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="ml-0.5">
+                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                        </svg>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Footer */}
                 {!sidebarCollapsed && (
@@ -1137,7 +1289,7 @@ export default function ChatApp() {
                             darkMode ? 'bg-white/5 text-dark-muted border border-dark-border' : 'bg-white/5 text-white/60 border-white/10'
                         }`}>
                             <p className="font-bold mb-0.5 text-lg gradient-text">AYLA BOT 2026</p>
-                            <p className="font-medium text-white/75">Powered by Gemini · MCP · Kapruka</p>
+                            <p className="font-medium text-white/75">Kapruka Customer Service Companion</p>
                         </div>
                     </div>
                 )}
@@ -1229,8 +1381,29 @@ export default function ChatApp() {
                             )}
                         </button>
                         <button
+                            onClick={handleToggleMusic}
+                            className={`p-2 rounded-lg transition-all duration-200 flex items-center justify-center cursor-pointer ${
+                                darkMode
+                                    ? 'bg-dark-card text-white hover:bg-brand-purple/20 hover:text-brand-purple border border-dark-border hover:border-brand-purple/50'
+                                    : 'bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-sm'
+                            }`}
+                            title={musicPlaying ? `Pause "${activeTrack === 'precision' ? 'Precision Mode' : 'Amber Eyes Awake'}"` : "Play Ambient Music"}
+                        >
+                            {musicPlaying ? (
+                                <div className="flex items-end gap-[3px] h-4.5 w-4.5 justify-center pb-0.5">
+                                    <span className="w-[2.5px] bg-current rounded-full animate-sound-bar-1" style={{ height: '50%' }}></span>
+                                    <span className="w-[2.5px] bg-current rounded-full animate-sound-bar-2" style={{ height: '90%' }}></span>
+                                    <span className="w-[2.5px] bg-current rounded-full animate-sound-bar-3" style={{ height: '35%' }}></span>
+                                </div>
+                            ) : (
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                            )}
+                        </button>
+                        <button
                             onClick={() => startTransition(() => setDarkMode(!darkMode))}
-                            className={`p-2 rounded-lg transition-all duration-200 ${
+                            className={`p-2 rounded-lg transition-all duration-200 cursor-pointer ${
                                 darkMode
                                     ? 'bg-dark-card text-white hover:bg-brand-purple/20 hover:text-brand-purple border border-dark-border hover:border-brand-purple/50'
                                     : 'bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-sm'
@@ -1269,7 +1442,24 @@ export default function ChatApp() {
                                     </span>
                                 )}
                             </button>
-                            <button onClick={() => setDarkMode(!darkMode)} className={`p-2 flex items-center justify-center rounded-lg transition-colors ${darkMode ? 'text-brand-purple-accent hover:bg-brand-purple/20' : 'text-white/80 hover:bg-white/20'}`}>
+                            <button 
+                                onClick={handleToggleMusic} 
+                                className={`p-2 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${darkMode ? 'text-brand-purple-accent hover:bg-brand-purple/20' : 'text-white/80 hover:bg-white/20'}`}
+                                title={musicPlaying ? `Pause "${activeTrack === 'precision' ? 'Precision Mode' : 'Amber Eyes Awake'}"` : "Play Ambient Music"}
+                            >
+                                {musicPlaying ? (
+                                    <div className="flex items-end gap-[3px] h-4.5 w-4.5 justify-center pb-0.5 animate-pulse">
+                                        <span className="w-[2.5px] bg-current rounded-full animate-sound-bar-1"></span>
+                                        <span className="w-[2.5px] bg-current rounded-full animate-sound-bar-2"></span>
+                                        <span className="w-[2.5px] bg-current rounded-full animate-sound-bar-3"></span>
+                                    </div>
+                                ) : (
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                    </svg>
+                                )}
+                            </button>
+                            <button onClick={() => setDarkMode(!darkMode)} className={`p-2 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${darkMode ? 'text-brand-purple-accent hover:bg-brand-purple/20' : 'text-white/80 hover:bg-white/20'}`}>
                                 {darkMode ? <SunIcon /> : <MoonIcon />}
                             </button>
                         </div>
@@ -3355,5 +3545,6 @@ export default function ChatApp() {
                 )}
             </AnimatePresence>
         </div>
+        </>
     );
 }
