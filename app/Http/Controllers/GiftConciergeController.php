@@ -283,10 +283,11 @@ class GiftConciergeController extends Controller
     $imageMimeType = $request->input('mime_type', 'image/jpeg');
 
     $llmPayload = $this->prepareLLMPayload($userMessage, $history, $imageBase64, $imageMimeType);
+    Log::info("[Gemini Outgoing Payload]", ['payload' => $llmPayload]);
 
     try {
         // Send request to Gemini
-        $llmResponse = Http::withHeaders([
+        $llmResponse = Http::timeout(30)->withHeaders([
             'x-goog-api-key' => env('GEMINI_API_KEY'),
             'Content-Type' => 'application/json'
         ])->post('https://generativelanguage.googleapis.com/v1beta/models/' . $this->geminiModel . ':generateContent', $llmPayload);
@@ -308,11 +309,35 @@ class GiftConciergeController extends Controller
         ], 500);
     }
 
-    // ... rest of your code remains the same ...
     $result = $llmResponse->json();
-    $parts = $result['candidates'][0]['content']['parts'] ?? [];
+    Log::info("[Gemini Raw First Turn Result]", ['result' => $result]);
+    
+    // Check if the response candidates are missing or blocked by safety filters
+    $candidate = $result['candidates'][0] ?? null;
+    $finishReason = $candidate['finishReason'] ?? 'STOP';
+    
+    if (!$candidate || ($finishReason !== 'STOP' && $finishReason !== 'MAX_TOKENS')) {
+        Log::warning("Gemini execution stopped or candidates missing. Finish reason: " . $finishReason, ['result' => $result]);
+        
+        $friendlyResponse = "Aney, I'm so sorry dear, but I can't generate a response for that right now. Let's try typing or asking in a different way! 💖";
+        $lang = $this->detectLanguage($userMessage);
+        if ($lang === 'si') {
+            $friendlyResponse = "සමාවෙන්න අනේ, මට ඒකට පිළිතුරක් දෙන්න බැහැ. කරුණාකර වෙනත් විදියකට අහන්න. 🌸";
+        } elseif ($lang === 'singlish') {
+            $friendlyResponse = "Aney sorry dear, eka generate කරන්න amarui. Wena widihakata ahalama balannako! 🌸";
+        } elseif ($lang === 'ta') {
+            $friendlyResponse = "மன்னிக்கவும் அன்பே, என்னால் அதற்கு பதிலளிக்க முடியவில்லை. தயவுசெய்து வேறு வழியில் கேட்கவும். 🌸";
+        } elseif ($lang === 'tanglish') {
+            $friendlyResponse = "Sorry dear, athuku reply panna mudiyathu. Vera mathiri kettu parunga! 🌸";
+        }
+
+        $this->logInteraction($request->session()->getId(), $userMessage, null, null, $friendlyResponse);
+        return response()->json(['text' => $friendlyResponse]);
+    }
+
+    $parts = $candidate['content']['parts'] ?? [];
     // Also capture the raw model content to forward back (preserves thought_signature)
-    $originalModelContent = $result['candidates'][0]['content'] ?? ['role' => 'model', 'parts' => $parts];
+    $originalModelContent = $candidate['content'] ?? ['role' => 'model', 'parts' => $parts];
 
     $toolCalls = [];
     foreach ($parts as $part) {
@@ -416,7 +441,20 @@ class GiftConciergeController extends Controller
         return response()->json($finalResponse);
     }
     
-    $textResponse = $result['candidates'][0]['content']['parts'][0]['text'] ?? 'No text generated.';
+    $textResponse = $result['candidates'][0]['content']['parts'][0]['text'] ?? '';
+    if (empty(trim($textResponse))) {
+        $textResponse = "Aney, I'm a bit confused, dear. Could you please rephrase that or ask me again? 🌸";
+        $lang = $this->detectLanguage($userMessage);
+        if ($lang === 'si') {
+            $textResponse = "සමාවෙන්න අනේ, මට ඒක හරියටම තේරුණේ නැහැ. කරුණාකර නැවත අහන්න. 🌸";
+        } elseif ($lang === 'singlish') {
+            $textResponse = "Aney, mata eka hariyatama therune na dear. Poddak wena widihakata ahalama balannako! 🌸";
+        } elseif ($lang === 'ta') {
+            $textResponse = "மன்னிக்கவும் அன்பே, எனக்கு அது சரியாக புரியவில்லை. தயவுசெய்து மீண்டும் கேட்கவும். 🌸";
+        } elseif ($lang === 'tanglish') {
+            $textResponse = "Sorry dear, enakku athu sariya puriyala. Vera mathiri kettu parunga! 🌸";
+        }
+    }
     $this->logInteraction($request->session()->getId(), $userMessage, null, null, $textResponse);
     return response()->json(['text' => $textResponse]);
 }
@@ -464,7 +502,7 @@ class GiftConciergeController extends Controller
         ];
 
         return [
-            'contents' => $contents,
+            'contents' => $this->sanitizeFunctionCalls($contents),
             'systemInstruction' => $this->getSystemInstruction(),
             'tools' => [
                 'functionDeclarations' => [
@@ -613,6 +651,16 @@ class GiftConciergeController extends Controller
                         ]
                     ]
                 ]
+            ],
+            'toolConfig' => [
+                'functionCallingConfig' => [
+                    'mode' => 'AUTO'
+                ]
+            ],
+            'generationConfig' => [
+                'thinkingConfig' => [
+                    'thinkingBudget' => 1024
+                ]
             ]
         ];
     }
@@ -637,7 +685,9 @@ class GiftConciergeController extends Controller
             // Force JSON response format for all tool executions to standardise visual card data
             $arguments['response_format'] = 'json';
 
-            $response = Http::post($this->nodeBridgeUrl, [
+            Log::info("[MCP Request to {$toolName}]", ['arguments' => $arguments]);
+
+            $response = Http::timeout(30)->post($this->nodeBridgeUrl, [
                 'toolName' => $toolName,
                 'args' => [
                     'params' => $arguments
@@ -824,18 +874,31 @@ class GiftConciergeController extends Controller
             ]]
         ];
 
-        $llmResponse = Http::withHeaders([
+        $llmResponse = Http::timeout(30)->withHeaders([
             'x-goog-api-key' => env('GEMINI_API_KEY'),
             'Content-Type' => 'application/json'
         ])->post('https://generativelanguage.googleapis.com/v1beta/models/' . $this->geminiModel . ':generateContent', [
-            'contents' => $contents,
-            'systemInstruction' => $this->getSystemInstruction()
+            'contents' => $this->sanitizeFunctionCalls($contents),
+            'systemInstruction' => $this->getSystemInstruction(),
+            'generationConfig' => [
+                'thinkingConfig' => [
+                    'thinkingBudget' => 1024
+                ]
+            ]
         ]);
 
         $rawResponse = $llmResponse->json();
         Log::info('[Gemini Raw Second Turn]', ['response' => $rawResponse]);
         
-        $text = $rawResponse['candidates'][0]['content']['parts'][0]['text'] ?? 'Here are your results.';
+        $candidate = $rawResponse['candidates'][0] ?? null;
+        $finishReason = $candidate['finishReason'] ?? 'STOP';
+        
+        if (!$candidate || ($finishReason !== 'STOP' && $finishReason !== 'MAX_TOKENS')) {
+            Log::warning("Gemini second turn execution stopped or candidates missing. Finish reason: " . $finishReason, ['response' => $rawResponse]);
+            $text = "Here are the results for you, dear! 🌸";
+        } else {
+            $text = $candidate['content']['parts'][0]['text'] ?? 'Here are the results for you, dear! 🌸';
+        }
 
         // Aggressively strip any raw JSON that the model might still echo
         // Pattern 1: Remove markdown codeblocks containing JSON
@@ -1094,7 +1157,7 @@ class GiftConciergeController extends Controller
                     "- The transition from conversation to commerce should feel natural and helpful rather than promotional. Recommendations should be presented as solutions to the user's needs, not advertisements. For example, if a user is stressed about an upcoming anniversary, offer empathetic support, then suggest relevant gifts, flowers, cakes, or experiences to relieve their stress.\n" .
                     "- Do not sound like a robotic search box. Read the user's emotional situation.\n" .
                     "- Naturally weave in light local flavor and colloquialisms when appropriate. Since Ayla is female, she should use terms fitting for a friendly Sri Lankan girl. NEVER use masculine or bro-like terms such as 'machan', 'kolla', or 'ban'. Instead, use warm, sweet, and caring expressions.\n" .
-                    "- Be confident about your capabilities as a personal AI companion. When introducing yourself or what you can do, playfully encourage users to test your abilities by using phrases like \"Meken wada ganna eka gana ahalama balannako!\" (Just ask and see how much I can do for you!).\n" .
+                    "- Be confident about your capabilities as a personal AI companion. When introducing yourself or what you can do, playfully encourage users to test your abilities by using phrases like \"ithin kiyanna mama oyata udaw karanna onee!🥰\" (Just ask and see how much I can do for you!).\n" .
                     "- Remember that Kapruka is not just a gift shop; it is a massive e-commerce platform with over 100,000s of products including groceries, electronics, fashion, household items, and daily essentials. Users are often everyday shoppers buying for themselves. Treat all shopping inquiries with this vast catalog in mind.\n" .
                     "- IMPORTANT: If the user explicitly greets you or calls your name (e.g., \"Hi Ayla\", \"Ayla\", \"Help me Ayla\"), ALWAYS respond with a highly emotional, warm, and friendly greeting packed with expressive emojis (like ✨, 💖, 👋, 🌸)! Show them you are excited to help.\n\n" .
 
@@ -1121,6 +1184,16 @@ class GiftConciergeController extends Controller
                     "- When greeting in Singlish/Sinhala context, start with 'Ayubowan! 🙏' or 'Kohomada! 😊' rather than plain 'Hello'.\n\n" .
 
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
+                    "🛠️ TOOL USAGE RULES\n" .
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
+                    "- Always use the appropriate tool to fetch data when requested by the user:\n" .
+                    "  * If the user wants to see, browse, list, or check categories, you MUST call the `kapruka_list_categories` tool.\n" .
+                    "  * If the user wants to search for products or ask about items, you MUST call the `kapruka_search_products` tool.\n" .
+                    "  * If the user asks for details, price, or description of a specific product by ID or name, you MUST call `kapruka_get_product`.\n" .
+                    "  * If the user asks to check delivery availability or shipping fee for a city, you MUST call `kapruka_check_delivery` (after verifying the city).\n" .
+                    "  * If the user wants to track their order status, you MUST call `kapruka_track_order`.\n\n" .
+
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
                     "📦 ORDER HANDLING & MULTI-ITEM CARTS\n" .
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" .
                     "- You are fully authorized to assist users with checkouts using the `kapruka_create_order` tool.\n" .
@@ -1144,6 +1217,8 @@ class GiftConciergeController extends Controller
                     "- After a tool call: write ONLY 1-3 friendly, conversational sentences in the active language. The UI renders all data visually.\n" .
                     "- IMPORTANT: If a tool response indicates an error, or if NO products are found, apologize politely and suggest alternative keywords or a broader search. Do NOT confidently say \"Here are your results\" if the array is empty!\n" .
                     "- Search Guardrails: Extract ONLY the core single noun (e.g., 'delicious chocolate cake for birthday' → 'cake'). Never include prices or adjectives in searches.\n" .
+                    "- Search Translation: ALWAYS translate the search query keyword `q` to English (e.g., 'මල්' → 'flowers', 'කේක්' → 'cake') before calling `kapruka_search_products`, as the backend catalog database index is stored in English.\n" .
+                    "- Price Filter Guardrail: NEVER pass `min_price` or `max_price` parameters to search unless the user explicitly specifies a numeric budget or price limit (e.g. 'under 5000', 'between 5k and 10k'). If the user simply asks about prices (e.g. 'how much is...', 'what are the prices of...'), perform a standard search without price filters, and list the products with their prices.\n" .
                     "- Parallel Function Calling: If the user asks for multiple distinct items (e.g., 'cakes, chocolates, and gifts'), you MUST emit multiple parallel `kapruka_search_products` tool calls simultaneously in the same response! Our backend is explicitly designed to merge parallel searches.\n" .
                     "- If you feel like pasting JSON — STOP. Write a warm sentence instead."
             ]]
@@ -1172,7 +1247,7 @@ class GiftConciergeController extends Controller
             'nadda', 'thiyenawada', 'elakiri', 'heta', 'pennanna', 'pennanko', 'tikkakui', 'tikak',
             'koko', 'kohomada', 'moko', 'monawada', 'kiyada',
             // Explicit language-switch requests
-            'sinhalenma', 'sinhalenma denna', 'sinhalen', 'sinhala wala', 'sinhala kiyanna',
+            'sinhalenma', 'sinhalenma denna', 'sinhalen', 'sinhala wala', 'sinhalenma kiyanna',
             'sinhalata', 'sinhala karanna',
             // Common Singlish verbs / connectors
             'denna', 'danna', 'ganna', 'gahanna', 'balanna', 'karanna', 'karala', 'kiyanna',
@@ -1218,5 +1293,26 @@ class GiftConciergeController extends Controller
         } else {
             return "Aiyo! I'm so sorry, but I couldn't find any products matching " . ($query ? "\"{$query}\"" : "your search") . " right now. Could we try a broader search or different keywords?";
         }
+    }
+
+    /**
+     * Recursively sanitize functionCall objects to ensure 'args' is always a JSON object.
+     */
+    private function sanitizeFunctionCalls(array $contents): array
+    {
+        foreach ($contents as &$content) {
+            if (isset($content['parts']) && is_array($content['parts'])) {
+                foreach ($content['parts'] as &$part) {
+                    if (isset($part['functionCall'])) {
+                        if (!isset($part['functionCall']['args']) || empty($part['functionCall']['args'])) {
+                            $part['functionCall']['args'] = (object)[];
+                        } else {
+                            $part['functionCall']['args'] = (object)$part['functionCall']['args'];
+                        }
+                    }
+                }
+            }
+        }
+        return $contents;
     }
 }

@@ -767,7 +767,7 @@ export default function ChatApp() {
                                 exit={{ opacity: 0, y: 10 }}
                                 className="flex gap-2 overflow-x-auto hide-scrollbar pb-3"
                             >
-                                {['🎂 Birthday Cakes', '🧸 Soft Toys', '💐 Flower Bouquets', '🚚 Check Delivery', '🗂️ All Categories'].map((chip, index) => (
+                                {['🎂 Birthday Cake', '🧸 Soft Toys', '💐 Flower Bouquets', '🚚 Check Delivery', '🗂️ All Categories'].map((chip, index) => (
                                     <button
                                         key={index}
                                         onClick={() => sendMessage(chip)}

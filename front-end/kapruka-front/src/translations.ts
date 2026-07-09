@@ -1,6 +1,6 @@
 export const translations = {
     en: {
-        heroTitle: "Meet Ayla, your Personal AI Shopping Concierge",
+        heroTitle: "I'm Ayla, your Personal AI Shopping Concierge",
         heroSub: "ආයුබෝවන් • வணக்கம் • Welcome",
         heroDesc: "Find gifts, flowers, cakes, electronics, and essentials with AI-powered assistance and island-wide delivery.",
         tryMeText: '"Curious what I can do for you? Just ask! ✨"',
@@ -20,12 +20,13 @@ export const translations = {
         inputPlaceholder: "What gift are you looking for today?",
     },
     si: {
-        heroTitle: "ඔබේ පෞද්ගලික AI සාප්පු සවාරි සහායකයා වන Ayla හමුවන්න",
+        // heroTitle: "ඔබේ පෞද්ගලික AI සාප්පු සවාරි සහායකයා වන Ayla හමුවන්න",
+        heroTitle: "මම Ayla,  ඔබේ AI සාප්පු සවාරි සහායිකාව",
         heroSub: "ආයුබෝවන් • வணக்கம் • Welcome",
         heroDesc: "මල් සිට කේක් දක්වාත්, තෑගි සිට ඉලෙක්ට්‍රොනික උපකරණ දක්වාත් ඔබට අවශ්‍ය ඕනෑම දෙයක් AI සහාය සමඟ සොයාගෙන, දිවයින පුරා වේගවත් හා විශ්වාසනීය බෙදාහැරීමක් ලබාගන්න.",
-        tryMeText: 'මට ඔබ වෙනුවෙන් කළ හැකි දේ ගැන කුතුහලයෙන් සිටිනවාද? අහන්න! 😊',
+        tryMeText: 'මට ඔබ වෙනුවෙන් කළ හැකි දේ ගැන කුතුහලයෙන්ද ඉන්නේ? අහන්න! 😊',
         welcomeTitle: "ආයුබෝවන් 👋 | வணக்கம் 👋",
-        welcomeSub: "මම Ayla, ඔබේ පෞද්ගලික සාප්පු සවාරි සහායකයා.",
+        welcomeSub: "ඔබේ සාප්පු සවාරි සහායිකාව",
         welcomeTellMe: "මට පවසන්න:",
         welcomeOccasion: "උත්සවය කුමක්ද?",
         welcomeBudget: "ඔබේ අයවැය කොපමණද?",
@@ -40,7 +41,8 @@ export const translations = {
         inputPlaceholder: "අද ඔබ සොයන්නේ කුමන ආකාරයේ තෑග්ගක්ද?",
     },
     ta: {
-        heroTitle: "உங்கள் தனிப்பட்ட AI ஷாப்பிங் உதவியாளர் Ayla ஐ சந்தியுங்கள்",
+        //heroTitle: "உங்கள் தனிப்பட்ட AI ஷாப்பிங் உதவியாளர் Ayla ஐ சந்தியுங்கள்",
+        heroTitle: "நான் Ayla, உங்கள் AI ஷாப்பிங் உதவியாளர்.",
         heroSub: "வணக்கம் • Welcome • ஆயுபோவன்",
         heroDesc: "பூக்கள், கேக்குகள், பரிசுகள், மின்னணு பொருட்கள் மற்றும் பிறவற்றை AI உதவியுடன் நாடு தழுவிய விநியோகத்துடன் கண்டறியுங்கள்.",
         tryMeText: '"நான் உங்களுக்கு எப்படி உதவ முடியும் என்று கேட்டுப் பாருங்கள்! 😊"',

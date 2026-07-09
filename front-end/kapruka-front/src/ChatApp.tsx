@@ -487,6 +487,16 @@ export default function ChatApp() {
         synthRef.current.speak(utterance);
     };
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const chatInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (!showSplash) {
+            const timer = setTimeout(() => {
+                chatInputRef.current?.focus();
+            }, 150);
+            return () => clearTimeout(timer);
+        }
+    }, [showSplash]);
 
     const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -643,9 +653,10 @@ export default function ChatApp() {
     });
     const [darkMode, setDarkMode] = useState(() => {
         if (typeof window !== 'undefined') {
-            return localStorage.getItem('kapruka-dark') === 'true';
+            const saved = localStorage.getItem('kapruka-dark');
+            return saved === null ? true : saved === 'true';
         }
-        return false;
+        return true;
     });
 
     // Custom feature states
@@ -703,6 +714,14 @@ export default function ChatApp() {
         {
             q: "What languages can I use to chat?",
             a: "Ayla is fully fluent in English, Sinhala, and Tamil. She also understands 'Singlish' and 'Tanglish'! Just start typing or speaking in whatever language feels most comfortable to you."
+        },
+        {
+            q: "How do I chat in Sinhala, Tamil, or Singlish/Tanglish?",
+            a: "You can type naturally just like you are texting a friend! Here are some examples of what you can say:\n\n💬 Sinhala (සිංහල):\n• 'අම්මාගේ උපන්දිනයට ලස්සන මල් කළඹක් සහ කේක් එකක් ඕනේ'\n• 'මල්වල ගණන් කොහොමද?'\n\n💬 Singlish (Romanized Sinhala):\n• 'Amma ge birthday ekata cake ekak ona'\n• 'Colombo 04 walata delivery rate eka keeyada?'\n\n💬 Tamil (தமிழ்):\n• 'அம்மா பிறந்தநாளுக்கு அழகான பூச்செண்டு மற்றும் கேக் வேண்டும்'\n• 'யாழ்ப்பாணத்திற்கு டெலிவரி செய்ய முடியுமா?'\n\n💬 Tanglish (Romanized Tamil):\n• 'Amma birthday ku oru cake and flower venum'\n• 'Negombo la delivery rate evvalavu?'"
+        },
+        {
+            q: "How does the end-to-end shopping system work?",
+            a: "The entire process from chat to doorstep delivery is seamless:\n\n1️⃣ CHAT & FIND: Tell Ayla what you need (e.g., 'Find a chocolate cake for my friend'). She searches Kapruka's catalog and shows the products directly in the chat interface.\n\n2️⃣ CHART & CUSTOMIZE: Select your items, customize details (like preferred flower colors or customized icing text for cakes), and click 'Add to Cart'.\n\n3️⃣ CHECK DELIVERY: Ask Ayla to verify delivery to your city (e.g., 'Check delivery availability to Kandy').\n\n4️⃣ ORDER DETAILS: Provide the recipient's details (Name, Contact Number, Address) and preferred delivery date.\n\n5️⃣ SECURE CHECKOUT: Ayla generates a secure payment summary link. Click it to pay safely via Kapruka's gateway.\n\n6️⃣ TRACK IN REAL-TIME: Once ordered, ask Ayla 'Track my order [Order Number]' at any time for live delivery updates!"
         },
         {
             q: "Can you deliver on specific dates or same-day?",
@@ -946,6 +965,9 @@ export default function ChatApp() {
             setMessages(prev => [...prev, { role: 'bot', text: "Sorry, I had trouble reaching the Kapruka database. Please try again." }]);
         } finally {
             setIsLoading(false);
+            setTimeout(() => {
+                chatInputRef.current?.focus();
+            }, 100);
         }
     };
 
@@ -991,7 +1013,7 @@ export default function ChatApp() {
                 mobileSidebarOpen ? 'flex translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
             } md:!transform-none`}>
                 {/* Logo */}
-                <div className={`p-4 pb-3 flex items-center justify-between ${sidebarCollapsed ? 'flex-col gap-2' : 'flex-row'}`}>
+                <div className={`p-4 pb-3 flex items-center justify-between pt-[calc(1rem+env(safe-area-inset-top))] md:pt-4 ${sidebarCollapsed ? 'flex-col gap-2' : 'flex-row'}`}>
                     {!sidebarCollapsed ? (
                         <div>
                             <h1 className="text-2xl font-black tracking-tight flex items-center gap-1">
@@ -1311,38 +1333,75 @@ export default function ChatApp() {
                 />
 
                 {/* ── Global Alert Bar ── */}
-                <div className="w-full bg-red-600 dark:bg-red-900/40 text-white text-center py-1.5 px-4 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 z-20 relative">
+                <div className="w-full bg-red-600 dark:bg-red-900/40 text-white text-center pt-[calc(0.4rem+env(safe-area-inset-top))] pb-1.5 px-4 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 z-20 relative">
                     <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-300 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-red-100"></span></span>
                     Order within <span className="font-mono bg-black/20 px-1 rounded">02:15:34</span> for same-day delivery
                 </div>
 
-                {/* ── Desktop Header Bar ── */}
-                <div className={`hidden md:flex items-center justify-between px-6 py-3 border-b z-10 transition-colors duration-300 ${
+                {/* ── Unified Responsive Header Bar ── */}
+                <div className={`flex flex-col md:flex-row md:items-center justify-between px-4 py-3.5 md:px-6 md:py-4 border-b z-20 transition-all duration-300 gap-3 ${
                     darkMode
-                        ? 'bg-dark-surface/60 backdrop-blur border-dark-border'
-                        : 'bg-white/10 backdrop-blur-xl border-white/20 shadow-[0_4px_30px_rgba(255,255,255,0.05)]'
+                        ? 'bg-dark-surface/90 backdrop-blur-xl border-dark-border text-dark-text'
+                        : 'bg-gradient-to-r from-[#20133c] via-[#1a0f30] to-[#0e071c] border-white/10 text-white shadow-lg shadow-[#0c0617]/40'
                 }`}>
-                    {/* Left: active chat info */}
-                    <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-sm ${
-                            darkMode ? 'bg-brand-purple/20 text-brand-purple-accent' : 'bg-brand-purple/10 text-brand-purple'
-                        }`}><ChatIcon /></div>
-                        <div>
-                            <p className={`text-sm font-bold leading-tight ${
-                                darkMode ? 'text-dark-text' : 'text-white drop-shadow-sm'
-                            }`}>{activeSession?.title || 'Active Chat'}</p>
-                            <p className={`text-[10px] ${
-                                darkMode ? 'text-dark-muted' : 'text-cyan-100/80 font-medium'
-                            }`}>{messages.length - 1} message{messages.length !== 2 ? 's' : ''} · {useMock ? '🧪 Mock' : '🔴 Live'}</p>
+                    <div className="flex items-center justify-between md:justify-start gap-3 w-full md:w-auto">
+                        <div className="flex items-center gap-2">
+                            {/* Hamburger Menu (Mobile Only) */}
+                            <button
+                                onClick={() => setMobileSidebarOpen(true)}
+                                className={`md:hidden p-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center ${
+                                    darkMode ? 'text-white hover:bg-white/10' : 'text-white/80 hover:bg-white/20'
+                                }`}
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                                </svg>
+                            </button>
+
+                            {/* Logo / Title */}
+                            <div className="flex items-center gap-2.5">
+                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-sm ${
+                                    darkMode ? 'bg-brand-purple/20 text-brand-purple-accent' : 'bg-white/15 text-pink-300 border border-white/10 shadow-[0_0_10px_rgba(244,114,182,0.2)]'
+                                }`}>
+                                    <ChatIcon />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-extrabold leading-tight tracking-wide flex items-center gap-1.5">
+                                        <span>{activeSession?.title || 'Active Chat'}</span>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                    </p>
+                                    <p className={`text-[10px] opacity-75 font-semibold mt-0.5 ${
+                                        darkMode ? 'text-dark-muted' : 'text-cyan-200'
+                                    }`}>
+                                        Ayla AI · {messages.length - 1} message{messages.length !== 2 ? 's' : ''}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Mobile New Chat Action */}
+                        <div className="flex items-center gap-2 md:hidden">
+                            <button 
+                                onClick={startNewChat}
+                                className={`p-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center ${
+                                    darkMode ? 'text-brand-purple-accent hover:bg-brand-purple/20' : 'text-pink-300 hover:bg-white/10'
+                                }`}
+                                title="New Chat"
+                            >
+                                <EditIcon />
+                            </button>
                         </div>
                     </div>
-                    {/* Right: actions */}
-                    <div className="flex items-center gap-2">
-                        {/* Language Selector */}
-                        <div className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold mr-1.5 border shadow-inner ${
-                            darkMode ? 'border-dark-border bg-white/5' : 'border-white/20 bg-white/10'
+
+                    {/* Right side options: Unified for all devices */}
+                    <div className="flex items-center justify-between md:justify-end gap-2.5 w-full md:w-auto border-t border-white/5 md:border-t-0 pt-2.5 md:pt-0">
+                        {/* Language Selector (Pills, responsive) */}
+                        <div className={`flex items-center gap-0.5 px-2 py-0.5 rounded-xl text-[11px] font-semibold border shadow-inner ${
+                            darkMode ? 'border-dark-border bg-white/5' : 'border-white/15 bg-white/5'
                         }`}>
-                            <span className="text-sm mr-0.5">🌐</span>
+                            <span className="text-xs mr-1 opacity-80">🌐</span>
                             {(['en', 'si', 'ta'] as const).map((lang) => {
                                 const labels = { en: 'English', si: 'සිංහල', ta: 'தமிழ்' };
                                 const isActive = currentLang === lang;
@@ -1350,14 +1409,12 @@ export default function ChatApp() {
                                     <button
                                         key={lang}
                                         onClick={() => setCurrentLang(lang)}
-                                        className={`px-1.5 py-0.5 rounded transition-all duration-200 cursor-pointer ${
+                                        className={`px-2 py-0.5 rounded-md transition-all duration-200 cursor-pointer ${
                                             isActive
                                                 ? darkMode 
                                                     ? 'bg-brand-purple/20 text-brand-purple-accent font-bold' 
-                                                    : 'bg-white/20 text-cyan-300 font-bold shadow-[0_0_10px_rgba(0,255,255,0.2)]'
-                                                : darkMode
-                                                    ? 'text-dark-muted hover:text-dark-text'
-                                                    : 'text-white/60 hover:text-white'
+                                                    : 'bg-white/15 text-pink-300 font-bold border border-white/10'
+                                                : 'opacity-70 hover:opacity-100'
                                         }`}
                                     >
                                         {labels[lang]}
@@ -1366,124 +1423,74 @@ export default function ChatApp() {
                             })}
                         </div>
 
-                        <button 
-                            onClick={handleToggleCart}
-                            className={`relative flex items-center justify-center p-2 rounded-lg transition-all duration-200 cursor-pointer ${
-                            darkMode
-                                ? 'bg-white/5 text-dark-muted hover:bg-white/10 hover:text-dark-text border border-dark-border'
-                                : 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
-                        }`}>
-                            <span className="flex items-center justify-center"><CartIcon /></span>
-                            {cart.length > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-brand-purple text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow-sm">
-                                    {cart.reduce((total, item) => total + item.qty, 0)}
-                                </span>
-                            )}
-                        </button>
-                        <button
-                            onClick={handleToggleMusic}
-                            className={`p-2 rounded-lg transition-all duration-200 flex items-center justify-center cursor-pointer ${
-                                darkMode
-                                    ? 'bg-dark-card text-white hover:bg-brand-purple/20 hover:text-brand-purple border border-dark-border hover:border-brand-purple/50'
-                                    : 'bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-sm'
-                            }`}
-                            title={musicPlaying ? `Pause "${activeTrack === 'precision' ? 'Precision Mode' : 'Amber Eyes Awake'}"` : "Play Ambient Music"}
-                        >
-                            {musicPlaying ? (
-                                <div className="flex items-end gap-[3px] h-4.5 w-4.5 justify-center pb-0.5">
-                                    <span className="w-[2.5px] bg-current rounded-full animate-sound-bar-1" style={{ height: '50%' }}></span>
-                                    <span className="w-[2.5px] bg-current rounded-full animate-sound-bar-2" style={{ height: '90%' }}></span>
-                                    <span className="w-[2.5px] bg-current rounded-full animate-sound-bar-3" style={{ height: '35%' }}></span>
-                                </div>
-                            ) : (
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                </svg>
-                            )}
-                        </button>
-                        <button
-                            onClick={() => startTransition(() => setDarkMode(!darkMode))}
-                            className={`p-2 rounded-lg transition-all duration-200 cursor-pointer ${
-                                darkMode
-                                    ? 'bg-dark-card text-white hover:bg-brand-purple/20 hover:text-brand-purple border border-dark-border hover:border-brand-purple/50'
-                                    : 'bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-sm'
-                            }`}
-                        >
-                            {darkMode ? <SunIcon /> : <MoonIcon />}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Mobile Header */}
-                <div className={`md:hidden p-4 shadow-md z-20 relative flex flex-col gap-2 transition-colors duration-300 ${
-                    darkMode ? 'bg-dark-surface border-b border-dark-border' : 'bg-[#002F6C]'
-                }`}>
-                    <div className="flex justify-between items-center w-full">
-                        <div className="flex items-center gap-1.5 z-30">
+                        <div className="flex items-center gap-2">
+                            {/* New Chat (Desktop only) */}
                             <button
-                                onClick={() => setMobileSidebarOpen(true)}
-                                className={`relative z-30 p-2 cursor-pointer flex items-center justify-center rounded-lg transition-colors ${darkMode ? 'text-white hover:bg-white/10' : 'text-white/80 hover:bg-white/20'}`}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                                onClick={startNewChat}
+                                className={`hidden md:flex p-2 rounded-lg transition-all duration-200 cursor-pointer border ${
+                                    darkMode
+                                        ? 'bg-dark-card border-dark-border text-white hover:bg-brand-purple/20 hover:text-brand-purple'
+                                        : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-white/20'
+                                }`}
+                                title="New Chat"
+                            >
+                                <EditIcon />
                             </button>
-                            <h1 className="text-base font-bold text-white whitespace-nowrap">Ayla</h1>
-                        </div>
-                        <div className="flex items-center gap-1 z-30">
-                            <button onClick={() => { startNewChat(); }} className={`relative z-30 p-2 cursor-pointer flex items-center justify-center rounded-lg transition-colors ${darkMode ? 'text-brand-purple-accent hover:bg-brand-purple/20' : 'text-white/80 hover:bg-white/20'}`}>
-                                <span className="pointer-events-none flex"><EditIcon /></span>
-                            </button>
+
+                            {/* Cart Icon */}
                             <button 
                                 onClick={handleToggleCart}
-                                className="relative text-white/80 p-2 flex items-center justify-center cursor-pointer"
+                                className={`relative flex items-center justify-center p-2 rounded-lg transition-all duration-200 cursor-pointer border ${
+                                    darkMode
+                                        ? 'bg-dark-card border-dark-border text-white hover:bg-brand-purple/20 hover:text-brand-purple'
+                                        : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-white/20'
+                                }`}
                             >
                                 <CartIcon />
                                 {cart.length > 0 && (
-                                    <span className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full shadow-sm">
+                                    <span className="absolute -top-1 -right-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow-md animate-bounce">
                                         {cart.reduce((total, item) => total + item.qty, 0)}
                                     </span>
                                 )}
                             </button>
-                            <button 
-                                onClick={handleToggleMusic} 
-                                className={`p-2 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${darkMode ? 'text-brand-purple-accent hover:bg-brand-purple/20' : 'text-white/80 hover:bg-white/20'}`}
-                                title={musicPlaying ? `Pause "${activeTrack === 'precision' ? 'Precision Mode' : 'Amber Eyes Awake'}"` : "Play Ambient Music"}
+
+                            {/* Sound/Music Button */}
+                            <button
+                                onClick={handleToggleMusic}
+                                className={`p-2 rounded-lg transition-all duration-200 flex items-center justify-center cursor-pointer border ${
+                                    darkMode
+                                        ? 'bg-dark-card border-dark-border text-white hover:bg-brand-purple/20 hover:text-brand-purple'
+                                        : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-white/20'
+                                }`}
+                                title={musicPlaying ? `Pause Soundtrack` : "Play Ambient Music"}
                             >
                                 {musicPlaying ? (
-                                    <div className="flex items-end gap-[3px] h-4.5 w-4.5 justify-center pb-0.5 animate-pulse">
-                                        <span className="w-[2.5px] bg-current rounded-full animate-sound-bar-1"></span>
-                                        <span className="w-[2.5px] bg-current rounded-full animate-sound-bar-2"></span>
-                                        <span className="w-[2.5px] bg-current rounded-full animate-sound-bar-3"></span>
+                                    <div className="flex items-end gap-[2.5px] h-4 w-4 justify-center pb-0.5">
+                                        <span className="w-[2px] bg-current rounded-full animate-sound-bar-1" style={{ height: '50%' }}></span>
+                                        <span className="w-[2px] bg-current rounded-full animate-sound-bar-2" style={{ height: '90%' }}></span>
+                                        <span className="w-[2px] bg-current rounded-full animate-sound-bar-3" style={{ height: '35%' }}></span>
                                     </div>
                                 ) : (
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                        <line x1="23" y1="9" x2="17" y2="15"></line>
+                                        <line x1="17" y1="9" x2="23" y2="15"></line>
                                     </svg>
                                 )}
                             </button>
-                            <button onClick={() => setDarkMode(!darkMode)} className={`p-2 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${darkMode ? 'text-brand-purple-accent hover:bg-brand-purple/20' : 'text-white/80 hover:bg-white/20'}`}>
+
+                            {/* Dark Mode toggle */}
+                            <button
+                                onClick={() => setDarkMode(!darkMode)}
+                                className={`p-2 rounded-lg transition-all duration-200 cursor-pointer border ${
+                                    darkMode
+                                        ? 'bg-dark-card border-dark-border text-white hover:bg-brand-purple/20 hover:text-brand-purple'
+                                        : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-white/20'
+                                }`}
+                            >
                                 {darkMode ? <SunIcon /> : <MoonIcon />}
                             </button>
                         </div>
-                    </div>
-                    {/* Mobile Language Selector */}
-                    <div className="flex items-center gap-1.5 justify-center py-1 border-t border-white/10 dark:border-dark-border/40 text-[11px]">
-                        <span className="text-white/60 dark:text-dark-muted font-medium">🌐 Language:</span>
-                        {(['en', 'si', 'ta'] as const).map((lang) => {
-                            const labels = { en: 'English', si: 'සිංහල', ta: 'தமிழ்' };
-                            const isActive = currentLang === lang;
-                            return (
-                                <button
-                                    key={lang}
-                                    onClick={() => setCurrentLang(lang)}
-                                    className={`px-2 py-0.5 rounded transition-all duration-200 cursor-pointer ${
-                                        isActive
-                                            ? 'bg-white/20 text-white font-bold'
-                                            : 'text-white/60 hover:text-white dark:text-dark-muted dark:hover:text-dark-text'
-                                    }`}
-                                >
-                                    {labels[lang]}
-                                </button>
-                            );
-                        })}
                     </div>
                 </div>
 
@@ -1585,9 +1592,9 @@ export default function ChatApp() {
                                                 </span>
                                             </button>
                                             <div 
-                                                className={`transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-40 opacity-100 mb-4' : 'max-h-0 opacity-0'} overflow-hidden`}
+                                                className={`transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-[600px] opacity-100 mb-4' : 'max-h-0 opacity-0'} overflow-hidden`}
                                             >
-                                                <div className={`px-6 text-[14px] leading-relaxed border-t mt-1 pt-4 ${
+                                                <div className={`px-6 text-[14px] leading-relaxed border-t mt-1 pt-4 whitespace-pre-line ${
                                                     darkMode ? 'text-dark-muted border-dark-border' : 'text-white/80 border-white/10'
                                                 }`}>
                                                     {faq.a}
@@ -1645,7 +1652,7 @@ export default function ChatApp() {
                                         <p className="text-cyan-300 text-base md:text-lg font-extrabold tracking-wide bg-white/10 px-6 py-2 rounded-full border border-white/20 backdrop-blur-md mb-3 shadow-[0_0_15px_rgba(0,255,255,0.3)]">
                                             ආයුබෝවන් • வணக்கம் • Welcome
                                         </p>
-                                        <h2 className="text-4xl sm:text-5xl md:text-7xl font-serif font-black tracking-tighter leading-[1] max-w-6xl bg-clip-text text-transparent pb-2 drop-shadow-md bg-gradient-to-br from-white via-cyan-50 to-pink-100">
+                                        <h2 className="text-4xl sm:text-5xl md:text-7xl font-serif font-black tracking-tighter p-2 leading-[1] max-w-7xl bg-clip-text text-transparent pb-2 drop-shadow-md bg-gradient-to-br from-white via-cyan-50 to-pink-100">
                                             {translations[currentLang].heroTitle.split('Ayla').map((part, i, arr) => (
                                                 <Fragment key={i}>
                                                     {part}
@@ -2709,7 +2716,7 @@ export default function ChatApp() {
                                         key={i}
                                         animate={{ height: ["6px", bar.h, "6px"] }} 
                                         transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: bar.d }} 
-                                        className="w-1.5 bg-green-400 rounded-full flex-shrink-0" 
+                                        className={`w-1.5 bg-green-400 rounded-full flex-shrink-0 ${i >= 12 ? 'hidden sm:block' : ''}`}
                                     />
                                 ))}
                             </div>
@@ -2723,22 +2730,23 @@ export default function ChatApp() {
                                 accept="image/*" 
                                 className="hidden" 
                             />
-                            <button type="button" onClick={() => fileInputRef.current?.click()} className={`absolute left-2 p-2 rounded-full transition-colors cursor-pointer ${darkMode ? 'text-white/60 hover:text-cyan-300 hover:bg-white/10' : 'text-brand-purple/70 hover:text-brand-purple hover:bg-brand-purple/10'}`}>
+                            <button type="button" onClick={() => fileInputRef.current?.click()} className={`absolute left-2 p-2 rounded-full transition-colors cursor-pointer z-30 ${darkMode ? 'text-white/60 hover:text-cyan-300 hover:bg-white/10' : 'text-brand-purple/70 hover:text-brand-purple hover:bg-brand-purple/10'}`}>
                                 <AttachmentIcon />
                             </button>
                             <input
+                                ref={chatInputRef}
                                 type="text"
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 placeholder={translations[currentLang].inputPlaceholder}
-                                className={`w-full py-4 pl-12 pr-[100px] rounded-full focus-glow transition-all duration-300 text-sm placeholder:tracking-wide neu-input ${
+                                className={`w-full py-4 pl-12 pr-[100px] rounded-full focus-glow transition-all duration-300 md:text-sm text-base font-bold placeholder:tracking-wide neu-input ${
                                     darkMode
                                         ? 'bg-dark-card/80 text-dark-text placeholder:text-dark-muted border border-dark-border focus:border-brand-purple/50'
                                         : 'bg-white text-gray-700 placeholder:text-gray-400 border border-gray-200 focus:border-brand-purple/50'
                                 }`}
                                 disabled={isLoading}
                             />
-                            <div className="absolute right-1.5 flex items-center gap-1">
+                            <div className="absolute right-1.5 flex items-center gap-1 z-30">
                                 <button 
                                     type="button" 
                                     onClick={toggleRecording} 
